@@ -519,6 +519,16 @@
             color: var(--primary);
         }
 
+        .ranking-notice {
+            padding: 10px 15px;
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #FFC107;
+            color: #FFC107;
+            font-size: 0.75rem;
+            margin: 10px 15px;
+            border-radius: 3px;
+        }
+
         .ranking-tabs {
             display: flex;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -543,6 +553,12 @@
         .ranking-tab.active {
             color: #FFD700;
             border-bottom: 2px solid #FFD700;
+        }
+
+        .ranking-tab-personal {
+            border-left: 2px solid rgba(255, 255, 255, 0.2);
+            margin-left: 5px;
+            padding-left: 15px;
         }
 
         .ranking-list {
@@ -1284,11 +1300,15 @@
             <span class="ranking-title">🌍 WORLD RANKING</span>
             <button class="ranking-close" id="rankingClose">✕</button>
         </div>
+        <div class="ranking-notice" id="rankingNotice">
+            ⚠️ ランキングは「的のサイズ50%・ゲーム時間30秒」のみ反映されます
+        </div>
         <div class="ranking-tabs">
-            <button class="ranking-tab active" data-mode="flick">FLICK</button>
-            <button class="ranking-tab" data-mode="tracking">TRACK</button>
-            <button class="ranking-tab" data-mode="reaction">REACT</button>
-            <button class="ranking-tab" data-mode="gridshot">GRID</button>
+            <button class="ranking-tab active" data-mode="flick" data-type="world">FLICK</button>
+            <button class="ranking-tab" data-mode="tracking" data-type="world">TRACK</button>
+            <button class="ranking-tab" data-mode="reaction" data-type="world">REACT</button>
+            <button class="ranking-tab" data-mode="gridshot" data-type="world">GRID</button>
+            <button class="ranking-tab ranking-tab-personal" data-mode="flick" data-type="personal">自己</button>
         </div>
         <div class="ranking-list" id="rankingList"></div>
     </div>
@@ -1789,11 +1809,12 @@
         const rankingClose = document.getElementById('rankingClose');
         const rankingList = document.getElementById('rankingList');
         let currentRankingMode = 'flick';
+        let currentRankingType = 'world'; // 'world' or 'personal'
 
         function openRanking() {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
-            displayRanking(currentRankingMode);
+            displayRanking(currentRankingMode, currentRankingType);
         }
 
         function closeRanking() {
@@ -1808,10 +1829,26 @@
         // ランキングタブ
         document.querySelectorAll('.ranking-tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentRankingMode = tab.dataset.mode;
-                displayRanking(currentRankingMode);
+                const tabType = tab.dataset.type || 'world';
+                
+                if (tabType === 'personal') {
+                    // 自己ランキングタブ：現在のモードで自己ランキングを表示
+                    document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentRankingType = 'personal';
+                    displayRanking(currentRankingMode, currentRankingType);
+                } else {
+                    // 世界ランキングタブ：モードを変更
+                    document.querySelectorAll('.ranking-tab').forEach(t => {
+                        if (t.dataset.type === 'world') {
+                            t.classList.remove('active');
+                        }
+                    });
+                    tab.classList.add('active');
+                    currentRankingMode = tab.dataset.mode;
+                    currentRankingType = 'world';
+                    displayRanking(currentRankingMode, currentRankingType);
+                }
             });
         });
 
@@ -2095,55 +2132,113 @@
         }
         
         async function saveScore(mode, score, accuracy, playerName) {
-            // ランキング条件：サイズ50%、秒数30秒のみ
-            const targetSize = Math.round(state.targetSizeMultiplier * 100);
-            if (targetSize !== 50 || state.gameDuration !== 30) {
-                return; // 条件を満たさない場合はランキングに保存しない
-            }
-            
             // 効率値 = スコア × 正確さ（%を小数に変換）
             const accNum = parseFloat(accuracy) / 100;
             const efficiency = Math.round(score * accNum);
             
-            const name = playerName && playerName.trim() ? playerName.trim() : 'Player';
+            // オートセーブ：プレイヤー名がなければ前回の名前を使用、なければ'Player'
+            let name = playerName && playerName.trim() ? playerName.trim() : '';
+            if (!name) {
+                name = localStorage.getItem('deadeyePlayerName') || 'Player';
+            }
             
             // 保存したプレイヤー名を記憶
             localStorage.setItem('deadeyePlayerName', name);
             
-            // 世界ランキングAPIに送信
-            try {
-                const response = await fetch('/api/ranking', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        mode: mode,
-                        name: name,
-                        score: score,
-                        accuracy: accuracy,
-                        efficiency: efficiency
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+            const targetSize = Math.round(state.targetSizeMultiplier * 100);
+            const scoreData = {
+                name: name,
+                score: score,
+                accuracy: accuracy,
+                efficiency: efficiency,
+                duration: state.gameDuration,
+                targetSize: targetSize,
+                date: new Date().toLocaleDateString('ja-JP')
+            };
+            
+            // 自己ランキングに保存（条件に関係なく全て保存）
+            const personalRankings = JSON.parse(localStorage.getItem('deadeyePersonalRankings') || '{}');
+            if (!personalRankings[mode]) personalRankings[mode] = [];
+            
+            // 同じプレイヤーの既存スコアをチェック
+            const existingIndex = personalRankings[mode].findIndex(r => 
+                r.name === name && r.efficiency === efficiency && r.date === scoreData.date
+            );
+            
+            if (existingIndex === -1) {
+                personalRankings[mode].push(scoreData);
+                // 効率値でソートして上位50件のみ保存
+                personalRankings[mode].sort((a, b) => b.efficiency - a.efficiency);
+                personalRankings[mode] = personalRankings[mode].slice(0, 50);
+                localStorage.setItem('deadeyePersonalRankings', JSON.stringify(personalRankings));
+            }
+            
+            // 世界ランキング条件：サイズ50%、秒数30秒のみ
+            if (targetSize === 50 && state.gameDuration === 30) {
+                // 世界ランキングAPIに送信
+                try {
+                    const response = await fetch('/api/ranking', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            mode: mode,
+                            name: name,
+                            score: score,
+                            accuracy: accuracy,
+                            efficiency: efficiency
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    console.log('World ranking saved:', result);
+                } catch (error) {
+                    console.error('Failed to save to world ranking:', error);
+                    console.error('Error details:', error.message, error.stack);
                 }
-                
-                const result = await response.json();
-                console.log('World ranking saved:', result);
-            } catch (error) {
-                console.error('Failed to save to world ranking:', error);
-                console.error('Error details:', error.message, error.stack);
             }
         }
 
         // ランキング表示
-        async function displayRanking(mode) {
+        async function displayRanking(mode, type = 'world') {
             rankingList.innerHTML = '<div class="ranking-empty">読み込み中...</div>';
             
+            // 自己ランキングの場合
+            if (type === 'personal') {
+                const playerName = localStorage.getItem('deadeyePlayerName') || 'Player';
+                const personalRankings = JSON.parse(localStorage.getItem('deadeyePersonalRankings') || '{}');
+                const modeRankings = (personalRankings[mode] || []).filter(r => r.name === playerName);
+                
+                if (modeRankings.length === 0) {
+                    rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
+                    return;
+                }
+                
+                // 効率値でソート
+                modeRankings.sort((a, b) => b.efficiency - a.efficiency);
+                
+                rankingList.innerHTML = modeRankings.map((r, i) => `
+                    <div class="ranking-item">
+                        <div class="ranking-position">#${i + 1}</div>
+                        <div class="ranking-info">
+                            <div class="ranking-name">${r.name || 'Player'}</div>
+                            <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
+                            <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
+                            <div class="ranking-settings">${r.duration || 30}s / 的${r.targetSize || 100}%</div>
+                        </div>
+                        <div class="ranking-date">${r.date}</div>
+                    </div>
+                `).join('');
+                return;
+            }
+            
+            // 世界ランキングの場合
             try {
-                // 世界ランキングをAPIから取得
                 const response = await fetch(`/api/ranking?mode=${mode}`);
                 
                 if (!response.ok) {
@@ -2172,26 +2267,7 @@
             } catch (error) {
                 console.error('Failed to fetch world ranking:', error);
                 console.error('Error details:', error.message, error.stack);
-                // フォールバック：ローカルランキングを表示
-                const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
-                const modeRankings = rankings[mode] || [];
-                
-                if (modeRankings.length === 0) {
-                    rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
-                    return;
-                }
-                
-                rankingList.innerHTML = modeRankings.map((r, i) => `
-                    <div class="ranking-item">
-                        <div class="ranking-position">#${i + 1}</div>
-                        <div class="ranking-info">
-                            <div class="ranking-name">${r.name || 'Player'}</div>
-                            <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
-                            <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
-                        </div>
-                        <div class="ranking-date">${r.date}</div>
-                    </div>
-                `).join('');
+                rankingList.innerHTML = '<div class="ranking-empty">読み込みに失敗しました</div>';
             }
         }
 
@@ -2572,6 +2648,17 @@
             const playerNameInput = document.getElementById('playerNameInput');
             playerNameInput.value = savedName || '';
             
+            // オートセーブ：ゲーム終了時に自動でスコアを保存
+            saveScore(state.currentMode, state.score, acc, savedName);
+            
+            // プレイヤー名変更時に再保存
+            playerNameInput.addEventListener('input', () => {
+                const newName = playerNameInput.value.trim() || savedName;
+                if (newName !== savedName) {
+                    saveScore(state.currentMode, state.score, acc, newName);
+                }
+            });
+            
             // ボタンを無効化してクールダウン表示
             const retryBtn = document.getElementById('retryBtn');
             const menuBtn = document.getElementById('menuBtn');
@@ -2601,13 +2688,16 @@
         }
 
         function retryGame() {
-            // スコアを保存
-            if (state.pendingScore) {
-                const playerName = document.getElementById('playerNameInput').value;
-                saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, playerName);
-                state.pendingScore = null;
+            // プレイヤー名が変更されていたら再保存
+            const playerNameInput = document.getElementById('playerNameInput');
+            const currentName = playerNameInput.value.trim();
+            const savedName = localStorage.getItem('deadeyePlayerName') || 'Player';
+            
+            if (currentName && currentName !== savedName && state.pendingScore) {
+                saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, currentName);
             }
             
+            state.pendingScore = null;
             resultOverlay.classList.remove('active');
             resetState();
             state.waitingForClick = true;
@@ -2615,12 +2705,16 @@
         }
 
         function backToMenu() {
-            // スコアを保存（リザルト画面からの場合）
-            if (state.pendingScore) {
-                const playerName = document.getElementById('playerNameInput').value;
-                saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, playerName);
-                state.pendingScore = null;
+            // プレイヤー名が変更されていたら再保存
+            const playerNameInput = document.getElementById('playerNameInput');
+            const currentName = playerNameInput.value.trim();
+            const savedName = localStorage.getItem('deadeyePlayerName') || 'Player';
+            
+            if (currentName && currentName !== savedName && state.pendingScore) {
+                saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, currentName);
             }
+            
+            state.pendingScore = null;
             
             state.isPlaying = false;
             state.waitingForClick = false;
