@@ -1,0 +1,2612 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEAD//EYE - Aim Trainer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        :root {
+            --primary: #FF4655;
+            --primary-glow: rgba(255, 70, 85, 0.4);
+            --bg-dark: #0F1923;
+            --bg-darker: #0A1018;
+            --bg-card: rgba(15, 25, 35, 0.9);
+            --text-primary: #ECE8E1;
+            --text-secondary: #768079;
+            --accent-cyan: #00FFC2;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: #050508;
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 3Dキャンバス */
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* 的（ヒット判定用の透明オーバーレイ） */
+        .target-overlay {
+            position: fixed;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+
+        /* メニュー */
+        .menu-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: 
+                radial-gradient(ellipse at 20% 80%, rgba(255, 70, 85, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(0, 255, 194, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(15, 25, 35, 0.95) 0%, rgba(5, 5, 8, 1) 100%);
+            overflow: hidden;
+        }
+
+        .menu-screen::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(135deg, transparent 40%, rgba(255, 70, 85, 0.03) 50%, transparent 60%),
+                linear-gradient(225deg, transparent 40%, rgba(0, 255, 194, 0.03) 50%, transparent 60%);
+            animation: menuShine 8s ease-in-out infinite;
+        }
+
+        @keyframes menuShine {
+            0%, 100% { opacity: 0.5; transform: translateX(-10%); }
+            50% { opacity: 1; transform: translateX(10%); }
+        }
+
+        .menu-screen.hidden { display: none; }
+
+        /* 背景グリッド */
+        .menu-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(90deg, rgba(255, 70, 85, 0.05) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(255, 70, 85, 0.05) 1px, transparent 1px);
+            background-size: 60px 60px;
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes gridMove {
+            0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+            100% { transform: perspective(500px) rotateX(60deg) translateY(60px); }
+        }
+
+        /* フローティングパーティクル */
+        .menu-particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            opacity: 0;
+            animation: particleFloat 10s ease-in-out infinite;
+        }
+
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .particle:nth-child(2) { left: 20%; animation-delay: 1s; }
+        .particle:nth-child(3) { left: 30%; animation-delay: 2s; }
+        .particle:nth-child(4) { left: 40%; animation-delay: 3s; }
+        .particle:nth-child(5) { left: 50%; animation-delay: 4s; }
+        .particle:nth-child(6) { left: 60%; animation-delay: 5s; }
+        .particle:nth-child(7) { left: 70%; animation-delay: 6s; }
+        .particle:nth-child(8) { left: 80%; animation-delay: 7s; }
+        .particle:nth-child(9) { left: 90%; animation-delay: 8s; }
+        .particle:nth-child(10) { left: 15%; animation-delay: 0.5s; background: var(--accent-cyan); }
+        .particle:nth-child(11) { left: 35%; animation-delay: 2.5s; background: var(--accent-cyan); }
+        .particle:nth-child(12) { left: 55%; animation-delay: 4.5s; background: var(--accent-cyan); }
+        .particle:nth-child(13) { left: 75%; animation-delay: 6.5s; background: var(--accent-cyan); }
+        .particle:nth-child(14) { left: 95%; animation-delay: 8.5s; background: var(--accent-cyan); }
+
+        @keyframes particleFloat {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(-100px) scale(1); opacity: 0; }
+        }
+
+        /* コーナーデコレーション */
+        .corner-deco {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            border: 2px solid transparent;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .corner-deco.top-left {
+            top: 30px;
+            left: 30px;
+            border-top-color: var(--primary);
+            border-left-color: var(--primary);
+        }
+
+        .corner-deco.top-right {
+            top: 30px;
+            right: 30px;
+            border-top-color: var(--accent-cyan);
+            border-right-color: var(--accent-cyan);
+        }
+
+        .corner-deco.bottom-left {
+            bottom: 30px;
+            left: 30px;
+            border-bottom-color: var(--accent-cyan);
+            border-left-color: var(--accent-cyan);
+        }
+
+        .corner-deco.bottom-right {
+            bottom: 30px;
+            right: 30px;
+            border-bottom-color: var(--primary);
+            border-right-color: var(--primary);
+        }
+
+        /* スキャンライン */
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            opacity: 0.3;
+            animation: scanlineMove 4s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes scanlineMove {
+            0% { top: -4px; }
+            100% { top: 100%; }
+        }
+
+        /* 設定ボタン */
+        .settings-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 70, 85, 0.3);
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 200;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: rotate(45deg);
+        }
+
+        /* 設定パネル */
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100vh;
+            background: var(--bg-card);
+            border-left: 1px solid rgba(255, 70, 85, 0.3);
+            z-index: 300;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .settings-panel.open {
+            right: 0;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 70, 85, 0.2);
+        }
+
+        .settings-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            color: var(--primary);
+        }
+
+        .settings-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+
+        .settings-close:hover {
+            color: var(--primary);
+        }
+
+        .settings-content {
+            padding: 20px;
+        }
+
+        .setting-item { margin-bottom: 15px; }
+
+        .setting-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .setting-value {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-cyan);
+        }
+
+        .setting-slider {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .setting-group {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255, 70, 85, 0.1);
+            border-bottom: 1px solid rgba(255, 70, 85, 0.1);
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .toggle-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .toggle-label input[type="checkbox"]:checked + span {
+            color: var(--accent-cyan);
+        }
+
+        .setting-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .setting-input-row .setting-slider {
+            flex: 1;
+        }
+
+        .setting-number {
+            width: 70px;
+            padding: 6px 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 70, 85, 0.3);
+            color: var(--accent-cyan);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            text-align: center;
+        }
+
+        .setting-number:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .setting-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 70, 85, 0.2);
+        }
+
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .color-options {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .color-btn {
+            width: 28px;
+            height: 28px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.15);
+        }
+
+        .color-btn.active {
+            border-color: white;
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        /* 設定パネル開いてる時のオーバーレイ */
+        .settings-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 250;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .settings-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* ランキング */
+        .ranking-btn {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            color: #FFD700;
+            font-size: 1.3rem;
+            cursor: pointer;
+            z-index: 200;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ranking-btn:hover {
+            border-color: #FFD700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .ranking-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 250;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .ranking-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .ranking-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 450px;
+            max-height: 80vh;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            z-index: 300;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .ranking-panel.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .ranking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .ranking-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            color: #FFD700;
+        }
+
+        .ranking-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .ranking-close:hover {
+            color: var(--primary);
+        }
+
+        .ranking-tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ranking-tab {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ranking-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .ranking-tab.active {
+            color: #FFD700;
+            border-bottom: 2px solid #FFD700;
+        }
+
+        .ranking-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.2);
+            margin-bottom: 8px;
+            border-left: 3px solid transparent;
+        }
+
+        .ranking-item:nth-child(1) {
+            border-left-color: #FFD700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .ranking-item:nth-child(2) {
+            border-left-color: #C0C0C0;
+            background: rgba(192, 192, 192, 0.05);
+        }
+
+        .ranking-item:nth-child(3) {
+            border-left-color: #CD7F32;
+            background: rgba(205, 127, 50, 0.05);
+        }
+
+        .ranking-position {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            width: 35px;
+            color: var(--text-secondary);
+        }
+
+        .ranking-item:nth-child(1) .ranking-position { color: #FFD700; }
+        .ranking-item:nth-child(2) .ranking-position { color: #C0C0C0; }
+        .ranking-item:nth-child(3) .ranking-position { color: #CD7F32; }
+
+        .ranking-info {
+            flex: 1;
+        }
+        
+        .ranking-name {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .ranking-score {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            color: var(--accent-cyan);
+        }
+
+        .ranking-details {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .ranking-settings {
+            font-size: 0.65rem;
+            color: var(--accent-cyan);
+            margin-top: 2px;
+            opacity: 0.8;
+        }
+
+        .ranking-date {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        .ranking-empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--text-primary);
+            text-shadow: 0 0 40px var(--primary-glow);
+            margin-bottom: 0.3rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.3em;
+            margin-bottom: 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* プリセットセクション */
+        .preset-section {
+            max-width: 500px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .preset-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .preset-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .preset-save-btn {
+            background: transparent;
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            padding: 5px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .preset-save-btn:hover {
+            background: var(--accent-cyan);
+            color: var(--bg-dark);
+        }
+
+        .preset-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .preset-item {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            min-width: 120px;
+            position: relative;
+        }
+
+        .preset-item:hover {
+            border-color: var(--primary);
+        }
+
+        .preset-item.active {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 255, 194, 0.1);
+        }
+
+        .preset-name {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .preset-info {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .preset-item .preset-edit,
+        .preset-item .preset-delete {
+            position: absolute;
+            top: 5px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .preset-item .preset-edit {
+            right: 22px;
+        }
+
+        .preset-item .preset-delete {
+            right: 5px;
+        }
+
+        .preset-item:hover .preset-edit,
+        .preset-item:hover .preset-delete {
+            opacity: 1;
+        }
+
+        .preset-item .preset-edit:hover {
+            color: var(--accent-cyan);
+        }
+
+        .preset-item .preset-delete:hover {
+            color: var(--primary);
+        }
+
+        /* プリセット保存モーダル */
+        .preset-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+
+        .preset-modal.active {
+            display: flex;
+        }
+
+        .preset-modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .preset-modal-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .preset-modal-input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+
+        .preset-modal-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .preset-settings {
+            margin-bottom: 20px;
+        }
+
+        .preset-setting-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .preset-setting-item label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+        }
+
+        .preset-setting-item input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .preset-setting-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .preset-setting-item span {
+            font-size: 0.85rem;
+            color: var(--accent-cyan);
+            min-width: 45px;
+            text-align: right;
+        }
+
+        .preset-setting-item.checkbox-row {
+            justify-content: flex-start;
+            gap: 20px;
+        }
+
+        .preset-setting-item.checkbox-row label {
+            min-width: auto;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .preset-setting-item.checkbox-row input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+        }
+
+        .preset-modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .preset-modal-btn {
+            flex: 1;
+            padding: 10px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .preset-modal-btn.save {
+            background: var(--accent-cyan);
+            border: none;
+            color: var(--bg-dark);
+        }
+
+        .preset-modal-btn.cancel {
+            background: transparent;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-secondary);
+        }
+
+        .preset-modal-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .mode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-width: 500px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .mode-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 70, 85, 0.2);
+            padding: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            color: inherit;
+            text-align: left;
+        }
+
+        .mode-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255, 70, 85, 0.2);
+        }
+
+        .mode-card h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            color: var(--primary);
+            margin-bottom: 0.2rem;
+        }
+
+        .mode-card p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .mode-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 0.8rem;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .mode-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mode-card:hover .mode-icon {
+            transform: scale(1.1);
+        }
+
+        .mode-card:hover .icon-flick {
+            color: var(--primary);
+        }
+
+        .mode-card:hover .icon-tracking {
+            color: var(--accent-cyan);
+        }
+
+        .mode-card:hover .icon-reaction {
+            color: #FFD700;
+        }
+
+        .mode-card:hover .icon-grid {
+            color: #FF6B9D;
+        }
+
+        /* HUD */
+        .hud {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 30px;
+            z-index: 50;
+            padding: 10px 30px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 70, 85, 0.3);
+        }
+
+        .hud.active { display: flex; }
+
+        .hud-item { text-align: center; }
+        .hud-label { font-size: 0.6rem; color: var(--text-secondary); letter-spacing: 0.1em; }
+        .hud-value { font-family: 'Orbitron', sans-serif; font-size: 1.4rem; font-weight: 700; }
+        .hud-value.score { color: var(--accent-cyan); }
+        .hud-value.time { color: var(--primary); }
+
+        /* クロスヘア */
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+
+        .crosshair.active { display: block; }
+
+        .crosshair-line {
+            position: absolute;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 8px var(--accent-cyan);
+        }
+
+        .crosshair-line.horizontal { width: 16px; height: 2px; top: 50%; transform: translateY(-50%); }
+        .crosshair-line.horizontal.left { right: calc(50% + 4px); }
+        .crosshair-line.horizontal.right { left: calc(50% + 4px); }
+        .crosshair-line.vertical { width: 2px; height: 16px; left: 50%; transform: translateX(-50%); }
+        .crosshair-line.vertical.top { bottom: calc(50% + 4px); }
+        .crosshair-line.vertical.bottom { top: calc(50% + 4px); }
+        .crosshair-dot {
+            position: absolute;
+            width: 4px; height: 4px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        /* その他のUI */
+        .back-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            padding: 8px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 500;
+            display: none;
+        }
+        .back-btn.active { display: block; }
+        .back-btn:hover { background: var(--primary); color: var(--bg-darker); }
+
+        .result-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(5, 5, 8, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .result-overlay.active { display: flex; }
+
+        .result-card {
+            text-align: center;
+            padding: 2rem 3.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+        }
+        .result-title { font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: var(--primary); margin-bottom: 1.2rem; }
+        .result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 1.2rem; }
+        .stat-value { font-family: 'Orbitron', sans-serif; font-size: 1.8rem; font-weight: 700; color: var(--accent-cyan); }
+        .stat-label { font-size: 0.7rem; color: var(--text-secondary); }
+        .result-buttons { display: flex; gap: 12px; justify-content: center; }
+        .result-btn { padding: 10px 30px; font-family: 'Rajdhani', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.3s; }
+        .result-btn.primary { background: var(--primary); color: var(--bg-darker); }
+        .result-btn.secondary { background: transparent; border: 1px solid var(--text-secondary); color: var(--text-secondary); }
+        .result-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+        
+        .result-cooldown {
+            text-align: center;
+            margin-bottom: 15px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            opacity: 1;
+            transition: opacity 0.3s;
+        }
+        .result-cooldown.hidden { opacity: 0; }
+        .result-cooldown #cooldownTimer {
+            color: var(--accent-cyan);
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        
+        .result-rank {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, rgba(255,70,85,0.2), rgba(0,255,200,0.1));
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+        }
+        .result-rank .rank-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .result-rank .rank-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 20px rgba(0, 255, 200, 0.5);
+        }
+        .result-rank.new-record .rank-value {
+            color: #FFD700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            animation: pulse-gold 1s ease infinite;
+        }
+        @keyframes pulse-gold {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .result-name-input {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin: 20px 0;
+        }
+        .result-name-input label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .result-name-input input {
+            width: 200px;
+            padding: 10px 16px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--text-secondary);
+            border-radius: 4px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .result-name-input input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            background: rgba(0, 255, 200, 0.05);
+        }
+        .result-name-input input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .countdown {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 6rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-shadow: 0 0 50px var(--primary-glow);
+            z-index: 150;
+            display: none;
+        }
+        .countdown.active { display: block; }
+
+        .click-to-start {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: var(--accent-cyan);
+            z-index: 160;
+            display: none;
+            animation: pulse 1.5s ease infinite;
+        }
+        .click-to-start.active { display: block; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .hit-marker {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0;
+        }
+        .hit-marker.show { animation: hitMarkerAnim 0.15s ease; }
+        @keyframes hitMarkerAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+        .hit-marker-line { position: absolute; width: 10px; height: 2px; background: white; }
+        .hit-marker-line:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+        .hit-marker-line:nth-child(2) { transform: rotate(-45deg) translate(-5px, 5px); }
+        .hit-marker-line:nth-child(3) { transform: rotate(135deg) translate(5px, -5px); }
+        .hit-marker-line:nth-child(4) { transform: rotate(-135deg) translate(-5px, -5px); }
+
+        .tracking-indicator { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); z-index: 60; display: none; text-align: center; }
+        .tracking-indicator.active { display: block; }
+        .tracking-bar { width: 200px; height: 5px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; margin-top: 6px; }
+        .tracking-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent-cyan)); width: 0%; border-radius: 3px; }
+
+        .esc-hint { position: fixed; top: 75px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; color: var(--text-secondary); z-index: 40; display: none; }
+        .esc-hint.active { display: block; }
+
+        .instructions { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 0.8rem; color: var(--text-secondary); z-index: 40; display: none; }
+        .instructions.active { display: block; }
+    </style>
+</head>
+<body>
+    <!-- 3Dキャンバス -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 設定ボタン -->
+    <button class="settings-btn" id="settingsBtn">⚙</button>
+    
+    <!-- ランキングボタン -->
+    <button class="ranking-btn" id="rankingBtn">🏆</button>
+    
+    <!-- プリセット保存モーダル -->
+    <div class="preset-modal" id="presetModal">
+        <div class="preset-modal-content">
+            <div class="preset-modal-title">プリセットを作成</div>
+            <input type="text" class="preset-modal-input" id="presetNameInput" placeholder="プリセット名">
+            
+            <div class="preset-settings">
+                <div class="preset-setting-item">
+                    <label>感度</label>
+                    <input type="range" id="presetSensitivity" min="10" max="200" value="100">
+                    <span id="presetSensitivityValue">1.0</span>
+                </div>
+                <div class="preset-setting-item">
+                    <label>的のサイズ</label>
+                    <input type="range" id="presetTargetSize" min="25" max="150" value="50">
+                    <span id="presetTargetSizeValue">50%</span>
+                </div>
+                <div class="preset-setting-item">
+                    <label>ゲーム時間</label>
+                    <input type="range" id="presetDuration" min="10" max="120" value="30">
+                    <span id="presetDurationValue">30s</span>
+                </div>
+                <div class="preset-setting-item checkbox-row">
+                    <label><input type="checkbox" id="presetInvertX"> 左右反転</label>
+                    <label><input type="checkbox" id="presetInvertY"> 上下反転</label>
+                </div>
+            </div>
+            
+            <div class="preset-modal-buttons">
+                <button class="preset-modal-btn cancel" id="presetCancelBtn">キャンセル</button>
+                <button class="preset-modal-btn save" id="presetConfirmBtn">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 設定オーバーレイ -->
+    <div class="settings-overlay" id="settingsOverlay"></div>
+    
+    <!-- ランキングオーバーレイ -->
+    <div class="ranking-overlay" id="rankingOverlay"></div>
+    
+    <!-- ランキングパネル -->
+    <div class="ranking-panel" id="rankingPanel">
+        <div class="ranking-header">
+            <span class="ranking-title">🏆 RANKING</span>
+            <button class="ranking-close" id="rankingClose">✕</button>
+        </div>
+        <div class="ranking-tabs">
+            <button class="ranking-tab active" data-mode="flick">FLICK</button>
+            <button class="ranking-tab" data-mode="tracking">TRACK</button>
+            <button class="ranking-tab" data-mode="reaction">REACT</button>
+            <button class="ranking-tab" data-mode="gridshot">GRID</button>
+        </div>
+        <div class="ranking-list" id="rankingList"></div>
+    </div>
+    
+    <!-- 設定パネル -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <span class="settings-title">SETTINGS</span>
+            <button class="settings-close" id="settingsClose">✕</button>
+        </div>
+        
+        <div class="settings-content">
+            <!-- 感度 -->
+            <div class="setting-item">
+                <div class="setting-label">感度</div>
+                <div class="setting-input-row">
+                    <input type="range" class="setting-slider" id="sensitivitySlider" min="0.1" max="2" step="0.001" value="1">
+                    <input type="number" class="setting-number" id="sensitivityInput" min="0.1" max="2" step="0.001" value="1.000">
+                </div>
+            </div>
+            
+            <!-- 的のサイズ -->
+            <div class="setting-item">
+                <div class="setting-label">的のサイズ<span class="setting-value" id="targetSizeValue">50%</span></div>
+                <input type="range" class="setting-slider" id="targetSizeSlider" min="25" max="150" step="5" value="50">
+            </div>
+            
+            <!-- ゲーム時間 -->
+            <div class="setting-item">
+                <div class="setting-label">ゲーム時間<span class="setting-value" id="durationValue">30s</span></div>
+                <input type="range" class="setting-slider" id="durationSlider" min="15" max="60" step="5" value="30">
+            </div>
+            
+            <!-- マウス反転 -->
+            <div class="setting-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="invertXCheckbox">
+                    <span>左右反転</span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="invertYCheckbox">
+                    <span>上下反転</span>
+                </label>
+            </div>
+            
+            <!-- クロスヘア設定 -->
+            <div class="setting-section">
+                <div class="section-title">✛ CROSSHAIR</div>
+                
+                <div class="setting-item">
+                    <div class="setting-label">色</div>
+                    <div class="color-options">
+                        <button class="color-btn active" data-color="#00FFC2" style="background:#00FFC2"></button>
+                        <button class="color-btn" data-color="#FF4655" style="background:#FF4655"></button>
+                        <button class="color-btn" data-color="#FFFFFF" style="background:#FFFFFF"></button>
+                        <button class="color-btn" data-color="#FFFF00" style="background:#FFFF00"></button>
+                        <button class="color-btn" data-color="#00FFFF" style="background:#00FFFF"></button>
+                        <button class="color-btn" data-color="#FF00FF" style="background:#FF00FF"></button>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <div class="setting-label">サイズ<span class="setting-value" id="crosshairSizeValue">16</span></div>
+                    <input type="range" class="setting-slider" id="crosshairSizeSlider" min="8" max="32" step="2" value="16">
+                </div>
+                
+                <div class="setting-item">
+                    <div class="setting-label">太さ<span class="setting-value" id="crosshairThicknessValue">2</span></div>
+                    <input type="range" class="setting-slider" id="crosshairThicknessSlider" min="1" max="6" step="1" value="2">
+                </div>
+                
+                <div class="setting-item">
+                    <div class="setting-label">間隔<span class="setting-value" id="crosshairGapValue">4</span></div>
+                    <input type="range" class="setting-slider" id="crosshairGapSlider" min="0" max="12" step="1" value="4">
+                </div>
+                
+                <div class="setting-item">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="crosshairDotCheckbox" checked>
+                        <span>中心ドット</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メニュー -->
+    <div class="menu-screen" id="menuScreen">
+        <!-- 背景エフェクト -->
+        <div class="menu-grid"></div>
+        <div class="menu-particles">
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+        </div>
+        <div class="corner-deco top-left"></div>
+        <div class="corner-deco top-right"></div>
+        <div class="corner-deco bottom-left"></div>
+        <div class="corner-deco bottom-right"></div>
+        <div class="scanline"></div>
+        
+        <h1 class="logo">DEAD<span style="color: var(--primary)">//</span>EYE</h1>
+        <p class="subtitle">射撃訓練場</p>
+        
+        <!-- プリセット選択 -->
+        <div class="preset-section">
+            <div class="preset-header">
+                <span class="preset-label">プリセット</span>
+                <button class="preset-save-btn" id="presetSaveBtn">+ 保存</button>
+            </div>
+            <div class="preset-list" id="presetList">
+                <button class="preset-item active" data-preset="default">
+                    <span class="preset-name">デフォルト</span>
+                    <span class="preset-info">50% / 30s / 感度1.0</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="mode-grid">
+            <button class="mode-card" data-mode="flick">
+                <div class="mode-icon icon-flick">
+                    <svg viewBox="0 0 40 40" fill="none">
+                        <circle cx="20" cy="20" r="16" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="20" cy="20" r="8" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="20" cy="20" r="2" fill="currentColor"/>
+                        <line x1="20" y1="0" x2="20" y2="8" stroke="currentColor" stroke-width="2"/>
+                        <line x1="20" y1="32" x2="20" y2="40" stroke="currentColor" stroke-width="2"/>
+                        <line x1="0" y1="20" x2="8" y2="20" stroke="currentColor" stroke-width="2"/>
+                        <line x1="32" y1="20" x2="40" y2="20" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3>FLICK SHOT</h3>
+                <p>的を素早く撃て</p>
+            </button>
+            <button class="mode-card" data-mode="tracking">
+                <div class="mode-icon icon-tracking">
+                    <svg viewBox="0 0 40 40" fill="none">
+                        <circle cx="28" cy="20" r="6" stroke="currentColor" stroke-width="2"/>
+                        <path d="M4 20 Q12 10, 20 20 T36 20" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="4 2"/>
+                        <polygon points="8,16 8,24 2,20" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h3>TRACKING</h3>
+                <p>動く的を追え</p>
+            </button>
+            <button class="mode-card" data-mode="reaction">
+                <div class="mode-icon icon-reaction">
+                    <svg viewBox="0 0 40 40" fill="none">
+                        <polygon points="22,2 14,18 20,18 16,38 30,16 22,16" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h3>REACTION</h3>
+                <p>即座に撃て</p>
+            </button>
+            <button class="mode-card" data-mode="gridshot">
+                <div class="mode-icon icon-grid">
+                    <svg viewBox="0 0 40 40" fill="none">
+                        <rect x="4" y="4" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <rect x="26" y="4" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <rect x="4" y="26" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <rect x="26" y="26" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="20" cy="20" r="5" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h3>GRID SHOT</h3>
+                <p>複数を処理</p>
+            </button>
+        </div>
+    </div>
+
+    <!-- UI -->
+    <div class="hud" id="hud">
+        <div class="hud-item"><div class="hud-label">SCORE</div><div class="hud-value score" id="scoreDisplay">0</div></div>
+        <div class="hud-item"><div class="hud-label">TIME</div><div class="hud-value time" id="timeDisplay">30</div></div>
+        <div class="hud-item"><div class="hud-label">ACCURACY</div><div class="hud-value" id="accuracyDisplay">100%</div></div>
+    </div>
+
+    <div class="tracking-indicator" id="trackingIndicator">
+        <span style="color: var(--accent-cyan); font-family: 'Orbitron'; font-size: 0.8rem;">TRACKING</span>
+        <div class="tracking-bar"><div class="tracking-fill" id="trackingFill"></div></div>
+    </div>
+
+    <div class="esc-hint" id="escHint">ESC でメニュー</div>
+    <button class="back-btn" id="backBtn">← MENU</button>
+    <div class="instructions" id="instructions"></div>
+    <div class="click-to-start" id="clickToStart">クリックして開始</div>
+    <div class="countdown" id="countdown">3</div>
+
+    <div class="crosshair" id="crosshair">
+        <div class="crosshair-line horizontal left"></div>
+        <div class="crosshair-line horizontal right"></div>
+        <div class="crosshair-line vertical top"></div>
+        <div class="crosshair-line vertical bottom"></div>
+        <div class="crosshair-dot"></div>
+    </div>
+
+    <div class="hit-marker" id="hitMarker">
+        <div class="hit-marker-line"></div>
+        <div class="hit-marker-line"></div>
+        <div class="hit-marker-line"></div>
+        <div class="hit-marker-line"></div>
+    </div>
+
+    <div class="result-overlay" id="resultOverlay">
+        <div class="result-card">
+            <h2 class="result-title">ROUND COMPLETE</h2>
+            <div class="result-rank" id="resultRank">
+                <span class="rank-label">ランキング</span>
+                <span class="rank-value" id="rankValue">#1</span>
+            </div>
+            <div class="result-stats">
+                <div class="stat-item"><div class="stat-value" id="finalScore">0</div><div class="stat-label">Score</div></div>
+                <div class="stat-item"><div class="stat-value" id="finalAccuracy">0%</div><div class="stat-label">Accuracy</div></div>
+                <div class="stat-item"><div class="stat-value" id="finalAvgTime">0</div><div class="stat-label">効率値</div></div>
+            </div>
+            <div class="result-name-input">
+                <label for="playerNameInput">プレイヤー名</label>
+                <input type="text" id="playerNameInput" placeholder="名前を入力" maxlength="12">
+            </div>
+            <div class="result-cooldown" id="resultCooldown">
+                <span id="cooldownTimer">3</span>秒後に操作可能
+            </div>
+            <div class="result-buttons">
+                <button class="result-btn primary" id="retryBtn" disabled>RETRY</button>
+                <button class="result-btn secondary" id="menuBtn" disabled>MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // サウンド
+        let audioCtx = null;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function playHitSound() {
+            initAudio();
+            const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+        }
+        function playMissSound() {
+            initAudio();
+            const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        }
+        function playCountSound() {
+            initAudio();
+            const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        }
+
+        // 状態
+        const state = {
+            currentMode: null, score: 0, hits: 0, misses: 0, totalClicks: 0,
+            timeLeft: 30, isPlaying: false, gameTimer: null, targetTimer: null,
+            reactionTimes: [], lastTargetTime: 0,
+            sensitivity: 1.0, targetSizeMultiplier: 0.5, gameDuration: 30,
+            invertX: false, invertY: false,
+            // 視点角度
+            pitch: 0, // 上下
+            yaw: 0,   // 左右
+            isPointerLocked: false, waitingForClick: false,
+            pendingScore: null // リザルト画面で保存待ちのスコア
+        };
+
+        // Three.js セットアップ
+        const canvas = document.getElementById('gameCanvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+        
+        // 照明
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+        
+        const pointLight = new THREE.PointLight(0xff4655, 0.5, 100);
+        pointLight.position.set(-5, 5, 5);
+        scene.add(pointLight);
+        
+        // 床グリッド
+        const gridHelper = new THREE.GridHelper(100, 50, 0xff4655, 0x333333);
+        gridHelper.position.y = -3;
+        scene.add(gridHelper);
+        
+        // 背景の壁
+        const wallGeometry = new THREE.PlaneGeometry(100, 20);
+        const wallMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x111122,
+            emissive: 0x050510
+        });
+        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+        wall.position.z = -20;
+        scene.add(wall);
+        
+        // 的を管理する配列
+        const targets3D = [];
+        
+        // DOM
+        const menuScreen = document.getElementById('menuScreen');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const accuracyDisplay = document.getElementById('accuracyDisplay');
+        const countdown = document.getElementById('countdown');
+        const crosshair = document.getElementById('crosshair');
+        const hitMarker = document.getElementById('hitMarker');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const trackingIndicator = document.getElementById('trackingIndicator');
+        const trackingFill = document.getElementById('trackingFill');
+        const instructions = document.getElementById('instructions');
+        const clickToStart = document.getElementById('clickToStart');
+        const hud = document.getElementById('hud');
+        const escHint = document.getElementById('escHint');
+        const backBtn = document.getElementById('backBtn');
+
+        // 設定
+        const sensitivitySlider = document.getElementById('sensitivitySlider');
+        const sensitivityInput = document.getElementById('sensitivityInput');
+        
+        sensitivitySlider.addEventListener('input', (e) => {
+            state.sensitivity = parseFloat(e.target.value);
+            sensitivityInput.value = state.sensitivity.toFixed(3);
+        });
+        sensitivityInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (isNaN(val)) val = 1;
+            val = Math.max(0.1, Math.min(2, val));
+            state.sensitivity = val;
+            sensitivitySlider.value = val;
+        });
+        sensitivityInput.addEventListener('blur', (e) => {
+            e.target.value = state.sensitivity.toFixed(3);
+        });
+        
+        document.getElementById('targetSizeSlider').addEventListener('input', (e) => {
+            state.targetSizeMultiplier = parseInt(e.target.value) / 100;
+            document.getElementById('targetSizeValue').textContent = e.target.value + '%';
+        });
+        document.getElementById('durationSlider').addEventListener('input', (e) => {
+            state.gameDuration = parseInt(e.target.value);
+            document.getElementById('durationValue').textContent = e.target.value + 's';
+        });
+        document.getElementById('invertXCheckbox').addEventListener('change', (e) => {
+            state.invertX = e.target.checked;
+        });
+        document.getElementById('invertYCheckbox').addEventListener('change', (e) => {
+            state.invertY = e.target.checked;
+        });
+        
+        // クロスヘア設定
+        const crosshairSettings = {
+            color: '#00FFC2',
+            size: 16,
+            thickness: 2,
+            gap: 4,
+            dot: true
+        };
+        
+        function updateCrosshair() {
+            const lines = crosshair.querySelectorAll('.crosshair-line');
+            const dot = crosshair.querySelector('.crosshair-dot');
+            
+            lines.forEach(line => {
+                line.style.background = crosshairSettings.color;
+                line.style.boxShadow = `0 0 8px ${crosshairSettings.color}`;
+                
+                if (line.classList.contains('horizontal')) {
+                    line.style.width = crosshairSettings.size + 'px';
+                    line.style.height = crosshairSettings.thickness + 'px';
+                    if (line.classList.contains('left')) {
+                        line.style.right = `calc(50% + ${crosshairSettings.gap}px)`;
+                    } else {
+                        line.style.left = `calc(50% + ${crosshairSettings.gap}px)`;
+                    }
+                } else {
+                    line.style.width = crosshairSettings.thickness + 'px';
+                    line.style.height = crosshairSettings.size + 'px';
+                    if (line.classList.contains('top')) {
+                        line.style.bottom = `calc(50% + ${crosshairSettings.gap}px)`;
+                    } else {
+                        line.style.top = `calc(50% + ${crosshairSettings.gap}px)`;
+                    }
+                }
+            });
+            
+            dot.style.background = crosshairSettings.color;
+            dot.style.boxShadow = `0 0 10px ${crosshairSettings.color}`;
+            dot.style.display = crosshairSettings.dot ? 'block' : 'none';
+        }
+        
+        // クロスヘア色
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                crosshairSettings.color = btn.dataset.color;
+                updateCrosshair();
+            });
+        });
+        
+        // クロスヘアサイズ
+        document.getElementById('crosshairSizeSlider').addEventListener('input', (e) => {
+            crosshairSettings.size = parseInt(e.target.value);
+            document.getElementById('crosshairSizeValue').textContent = e.target.value;
+            updateCrosshair();
+        });
+        
+        // クロスヘア太さ
+        document.getElementById('crosshairThicknessSlider').addEventListener('input', (e) => {
+            crosshairSettings.thickness = parseInt(e.target.value);
+            document.getElementById('crosshairThicknessValue').textContent = e.target.value;
+            updateCrosshair();
+        });
+        
+        // クロスヘア間隔
+        document.getElementById('crosshairGapSlider').addEventListener('input', (e) => {
+            crosshairSettings.gap = parseInt(e.target.value);
+            document.getElementById('crosshairGapValue').textContent = e.target.value;
+            updateCrosshair();
+        });
+        
+        // クロスヘアドット
+        document.getElementById('crosshairDotCheckbox').addEventListener('change', (e) => {
+            crosshairSettings.dot = e.target.checked;
+            updateCrosshair();
+        });
+
+        const modeConfig = {
+            flick: { baseSize: 80, instruction: '視点を動かして的を撃て！' },
+            tracking: { baseSize: 100, instruction: '動く的を追い続けろ！' },
+            reaction: { baseSize: 90, instruction: '出現したら即撃て！' },
+            gridshot: { baseSize: 70, instruction: '全ての的を処理！' }
+        };
+
+        document.querySelectorAll('.mode-card').forEach(card => {
+            card.addEventListener('click', () => startGame(card.dataset.mode));
+        });
+        backBtn.addEventListener('click', backToMenu);
+        document.getElementById('retryBtn').addEventListener('click', retryGame);
+        document.getElementById('menuBtn').addEventListener('click', backToMenu);
+
+        // 設定パネル開閉
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const settingsClose = document.getElementById('settingsClose');
+
+        function openSettings() {
+            settingsPanel.classList.add('open');
+            settingsOverlay.classList.add('open');
+        }
+
+        function closeSettings() {
+            settingsPanel.classList.remove('open');
+            settingsOverlay.classList.remove('open');
+        }
+
+        settingsBtn.addEventListener('click', openSettings);
+        settingsClose.addEventListener('click', closeSettings);
+        settingsOverlay.addEventListener('click', closeSettings);
+
+        // ランキング
+        const rankingBtn = document.getElementById('rankingBtn');
+        const rankingPanel = document.getElementById('rankingPanel');
+        const rankingOverlay = document.getElementById('rankingOverlay');
+        const rankingClose = document.getElementById('rankingClose');
+        const rankingList = document.getElementById('rankingList');
+        let currentRankingMode = 'flick';
+
+        function openRanking() {
+            rankingPanel.classList.add('open');
+            rankingOverlay.classList.add('open');
+            displayRanking(currentRankingMode);
+        }
+
+        function closeRanking() {
+            rankingPanel.classList.remove('open');
+            rankingOverlay.classList.remove('open');
+        }
+
+        rankingBtn.addEventListener('click', openRanking);
+        rankingClose.addEventListener('click', closeRanking);
+        rankingOverlay.addEventListener('click', closeRanking);
+
+        // ランキングタブ
+        document.querySelectorAll('.ranking-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentRankingMode = tab.dataset.mode;
+                displayRanking(currentRankingMode);
+            });
+        });
+
+        // プリセット機能
+        const presetList = document.getElementById('presetList');
+        const presetSaveBtn = document.getElementById('presetSaveBtn');
+        const presetModal = document.getElementById('presetModal');
+        const presetNameInput = document.getElementById('presetNameInput');
+        const presetCancelBtn = document.getElementById('presetCancelBtn');
+        const presetConfirmBtn = document.getElementById('presetConfirmBtn');
+        
+        // プリセットモーダル内の設定要素
+        const presetSensitivitySlider = document.getElementById('presetSensitivity');
+        const presetSensitivityValue = document.getElementById('presetSensitivityValue');
+        const presetTargetSizeSlider = document.getElementById('presetTargetSize');
+        const presetTargetSizeValue = document.getElementById('presetTargetSizeValue');
+        const presetDurationSlider = document.getElementById('presetDuration');
+        const presetDurationValue = document.getElementById('presetDurationValue');
+        const presetInvertXCheckbox = document.getElementById('presetInvertX');
+        const presetInvertYCheckbox = document.getElementById('presetInvertY');
+        
+        // モーダル内スライダーのイベント
+        presetSensitivitySlider.addEventListener('input', () => {
+            presetSensitivityValue.textContent = (presetSensitivitySlider.value / 100).toFixed(1);
+        });
+        presetTargetSizeSlider.addEventListener('input', () => {
+            presetTargetSizeValue.textContent = presetTargetSizeSlider.value + '%';
+        });
+        presetDurationSlider.addEventListener('input', () => {
+            presetDurationValue.textContent = presetDurationSlider.value + 's';
+        });
+
+        // デフォルトプリセット
+        const defaultPreset = {
+            id: 'default',
+            name: 'デフォルト',
+            sensitivity: 1.0,
+            targetSize: 0.5,
+            duration: 30,
+            invertX: false,
+            invertY: false
+        };
+
+        // プリセットをロード
+        function loadPresets() {
+            const saved = localStorage.getItem('aimPresets');
+            return saved ? JSON.parse(saved) : [defaultPreset];
+        }
+
+        // プリセットを保存
+        function savePresets(presets) {
+            localStorage.setItem('aimPresets', JSON.stringify(presets));
+        }
+
+        // プリセットリストを表示
+        function renderPresets() {
+            const presets = loadPresets();
+            const currentPresetId = localStorage.getItem('currentPreset') || 'default';
+            
+            presetList.innerHTML = presets.map(p => `
+                <button class="preset-item ${p.id === currentPresetId ? 'active' : ''}" data-preset="${p.id}">
+                    <span class="preset-name">${p.name}</span>
+                    <span class="preset-info">${Math.round(p.targetSize * 100)}% / ${p.duration}s / 感度${p.sensitivity.toFixed(1)}</span>
+                    <span class="preset-edit" data-edit="${p.id}">✎</span>
+                    ${p.id !== 'default' ? '<span class="preset-delete" data-delete="' + p.id + '">✕</span>' : ''}
+                </button>
+            `).join('');
+
+            // プリセット選択イベント
+            presetList.querySelectorAll('.preset-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('preset-delete')) return;
+                    if (e.target.classList.contains('preset-edit')) return;
+                    selectPreset(item.dataset.preset);
+                });
+            });
+
+            // 編集ボタンイベント
+            presetList.querySelectorAll('.preset-edit').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openEditPresetModal(btn.dataset.edit);
+                });
+            });
+
+            // 削除ボタンイベント
+            presetList.querySelectorAll('.preset-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deletePreset(btn.dataset.delete);
+                });
+            });
+        }
+
+        // プリセットを選択
+        function selectPreset(presetId) {
+            const presets = loadPresets();
+            const preset = presets.find(p => p.id === presetId);
+            if (!preset) return;
+
+            // 設定を適用
+            state.sensitivity = preset.sensitivity;
+            state.targetSizeMultiplier = preset.targetSize;
+            state.gameDuration = preset.duration;
+            state.timeLeft = preset.duration;
+            state.invertX = preset.invertX;
+            state.invertY = preset.invertY;
+
+            // UIを更新
+            sensitivitySlider.value = preset.sensitivity;
+            sensitivityInput.value = preset.sensitivity.toFixed(3);
+            targetSizeSlider.value = preset.targetSize * 100;
+            targetSizeValue.textContent = Math.round(preset.targetSize * 100) + '%';
+            durationSlider.value = preset.duration;
+            durationValue.textContent = preset.duration + 's';
+            invertXCheckbox.checked = preset.invertX;
+            invertYCheckbox.checked = preset.invertY;
+
+            // 現在のプリセットを保存
+            localStorage.setItem('currentPreset', presetId);
+
+            // UIを更新
+            renderPresets();
+        }
+
+        // プリセットを削除
+        function deletePreset(presetId) {
+            let presets = loadPresets();
+            presets = presets.filter(p => p.id !== presetId);
+            savePresets(presets);
+
+            // 削除したのが現在のプリセットなら、デフォルトに戻す
+            if (localStorage.getItem('currentPreset') === presetId) {
+                selectPreset('default');
+            }
+
+            renderPresets();
+        }
+
+        // プリセット保存モーダルを開く
+        let editingPresetId = null; // 編集中のプリセットID
+
+        function openPresetModal() {
+            editingPresetId = null;
+            presetNameInput.value = '';
+            document.querySelector('.preset-modal-title').textContent = 'プリセットを作成';
+            // 現在の設定をモーダルに反映
+            presetSensitivitySlider.value = state.sensitivity * 100;
+            presetSensitivityValue.textContent = state.sensitivity.toFixed(1);
+            presetTargetSizeSlider.value = state.targetSizeMultiplier * 100;
+            presetTargetSizeValue.textContent = Math.round(state.targetSizeMultiplier * 100) + '%';
+            presetDurationSlider.value = state.gameDuration;
+            presetDurationValue.textContent = state.gameDuration + 's';
+            presetInvertXCheckbox.checked = state.invertX;
+            presetInvertYCheckbox.checked = state.invertY;
+            
+            presetModal.classList.add('active');
+            presetNameInput.focus();
+        }
+
+        // プリセット編集モーダルを開く
+        function openEditPresetModal(presetId) {
+            const presets = loadPresets();
+            const preset = presets.find(p => p.id === presetId);
+            if (!preset) return;
+
+            editingPresetId = presetId;
+            document.querySelector('.preset-modal-title').textContent = 'プリセットを編集';
+            presetNameInput.value = preset.name;
+            presetSensitivitySlider.value = preset.sensitivity * 100;
+            presetSensitivityValue.textContent = preset.sensitivity.toFixed(1);
+            presetTargetSizeSlider.value = preset.targetSize * 100;
+            presetTargetSizeValue.textContent = Math.round(preset.targetSize * 100) + '%';
+            presetDurationSlider.value = preset.duration;
+            presetDurationValue.textContent = preset.duration + 's';
+            presetInvertXCheckbox.checked = preset.invertX || false;
+            presetInvertYCheckbox.checked = preset.invertY || false;
+            
+            presetModal.classList.add('active');
+            presetNameInput.focus();
+        }
+
+        // プリセット保存モーダルを閉じる
+        function closePresetModal() {
+            presetModal.classList.remove('active');
+            editingPresetId = null;
+        }
+
+        // 新しいプリセットを保存
+        function saveNewPreset() {
+            const name = presetNameInput.value.trim();
+            if (!name) {
+                presetNameInput.style.borderColor = 'var(--primary)';
+                return;
+            }
+
+            // モーダル内のスライダーの値を使用
+            const newSensitivity = presetSensitivitySlider.value / 100;
+            const newTargetSize = presetTargetSizeSlider.value / 100;
+            const newDuration = parseInt(presetDurationSlider.value);
+            const newInvertX = presetInvertXCheckbox.checked;
+            const newInvertY = presetInvertYCheckbox.checked;
+
+            const presets = loadPresets();
+            
+            if (editingPresetId) {
+                // 編集モード: 既存のプリセットを更新
+                const presetIndex = presets.findIndex(p => p.id === editingPresetId);
+                if (presetIndex !== -1) {
+                    presets[presetIndex] = {
+                        ...presets[presetIndex],
+                        name: name,
+                        sensitivity: newSensitivity,
+                        targetSize: newTargetSize,
+                        duration: newDuration,
+                        invertX: newInvertX,
+                        invertY: newInvertY
+                    };
+                    savePresets(presets);
+                    selectPreset(editingPresetId);
+                }
+            } else {
+                // 新規作成モード
+                const newPreset = {
+                    id: 'preset_' + Date.now(),
+                    name: name,
+                    sensitivity: newSensitivity,
+                    targetSize: newTargetSize,
+                    duration: newDuration,
+                    invertX: newInvertX,
+                    invertY: newInvertY
+                };
+                presets.push(newPreset);
+                savePresets(presets);
+                selectPreset(newPreset.id);
+            }
+
+            closePresetModal();
+            renderPresets();
+        }
+
+        // イベントリスナー
+        presetSaveBtn.addEventListener('click', openPresetModal);
+        presetCancelBtn.addEventListener('click', closePresetModal);
+        presetConfirmBtn.addEventListener('click', saveNewPreset);
+        presetNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') saveNewPreset();
+        });
+
+        // 初期化時にプリセットをロード
+        renderPresets();
+        
+        // 保存されているプリセットを適用
+        const savedPresetId = localStorage.getItem('currentPreset');
+        if (savedPresetId) {
+            selectPreset(savedPresetId);
+        }
+
+        // ランキング保存
+        // 順位を計算（保存前に呼び出す）
+        function calculateRank(mode, efficiency, playerName) {
+            const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
+            const modeRankings = rankings[mode] || [];
+            const name = playerName && playerName.trim() ? playerName.trim() : 'Player';
+            
+            // 現在のランキングで何位になるか計算（同じ名前のプレイヤーは除外）
+            let rank = 1;
+            for (const record of modeRankings) {
+                // 同じ名前のプレイヤーの既存スコアは除外して計算
+                if (record.name !== name && record.efficiency >= efficiency) {
+                    rank++;
+                }
+            }
+            return Math.min(rank, 51); // 51位以上は圏外
+        }
+        
+        function saveScore(mode, score, accuracy, playerName) {
+            const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
+            if (!rankings[mode]) rankings[mode] = [];
+            
+            // 効率値 = スコア × 正確さ（%を小数に変換）
+            const accNum = parseFloat(accuracy) / 100;
+            const efficiency = Math.round(score * accNum);
+            
+            const name = playerName && playerName.trim() ? playerName.trim() : 'Player';
+            
+            // 同じ名前のプレイヤーが既に存在するかチェック
+            const existingIndex = rankings[mode].findIndex(r => r.name === name);
+            
+            if (existingIndex !== -1) {
+                // 既存のスコアより高い場合のみ更新
+                if (efficiency > rankings[mode][existingIndex].efficiency) {
+                    rankings[mode][existingIndex] = {
+                        name: name,
+                        score: score,
+                        accuracy: accuracy,
+                        efficiency: efficiency,
+                        duration: state.gameDuration,
+                        targetSize: Math.round(state.targetSizeMultiplier * 100),
+                        date: new Date().toLocaleDateString('ja-JP')
+                    };
+                }
+            } else {
+                // 新規プレイヤーを追加
+                rankings[mode].push({
+                    name: name,
+                    score: score,
+                    accuracy: accuracy,
+                    efficiency: efficiency,
+                    duration: state.gameDuration,
+                    targetSize: Math.round(state.targetSizeMultiplier * 100),
+                    date: new Date().toLocaleDateString('ja-JP')
+                });
+            }
+            
+            // 効率値でソートして上位50件のみ保存
+            rankings[mode].sort((a, b) => b.efficiency - a.efficiency);
+            rankings[mode] = rankings[mode].slice(0, 50);
+            
+            localStorage.setItem('deadeyeRankings', JSON.stringify(rankings));
+            
+            // 保存したプレイヤー名を記憶
+            localStorage.setItem('deadeyePlayerName', name);
+        }
+
+        // ランキング表示
+        function displayRanking(mode) {
+            const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
+            const modeRankings = rankings[mode] || [];
+            
+            if (modeRankings.length === 0) {
+                rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
+                return;
+            }
+            
+            rankingList.innerHTML = modeRankings.map((r, i) => `
+                <div class="ranking-item">
+                    <div class="ranking-position">#${i + 1}</div>
+                    <div class="ranking-info">
+                        <div class="ranking-name">${r.name || 'Player'}</div>
+                        <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
+                        <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
+                        <div class="ranking-settings">${r.duration || 30}s / 的${r.targetSize || 100}%</div>
+                    </div>
+                    <div class="ranking-date">${r.date}</div>
+                </div>
+            `).join('');
+        }
+
+        // ポインターロック
+        document.addEventListener('pointerlockchange', () => {
+            state.isPointerLocked = document.pointerLockElement === document.body;
+            if (state.isPointerLocked && state.waitingForClick) {
+                state.waitingForClick = false;
+                clickToStart.classList.remove('active');
+                startCountdown();
+            }
+        });
+
+        // マウス移動 = 視点回転（プレイヤーは動かない）
+        document.addEventListener('mousemove', (e) => {
+            if (!state.isPointerLocked || !state.isPlaying) return;
+            
+            // 反転設定を適用（デフォルトが正常、チェックで反転）
+            const xDir = state.invertX ? -1 : 1;
+            const yDir = state.invertY ? -1 : 1;
+            
+            state.yaw += e.movementX * state.sensitivity * 0.1 * xDir;
+            state.pitch += e.movementY * state.sensitivity * 0.1 * yDir;
+            
+            // 制限
+            state.pitch = Math.max(-45, Math.min(45, state.pitch));
+            state.yaw = Math.max(-60, Math.min(60, state.yaw));
+            
+            updateWorld();
+        });
+
+        function updateWorld() {
+            // Three.jsカメラの回転（ラジアンに変換）
+            camera.rotation.x = -state.pitch * Math.PI / 180;
+            camera.rotation.y = -state.yaw * Math.PI / 180;
+        }
+        
+        // Three.js アニメーションループ
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        // ウィンドウリサイズ対応
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // クリック = 射撃（Three.js Raycaster使用）
+        const raycaster = new THREE.Raycaster();
+        
+        document.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            
+            if (!state.isPointerLocked && state.waitingForClick) {
+                document.body.requestPointerLock();
+                return;
+            }
+            
+            if (!state.isPlaying || !state.isPointerLocked) return;
+            
+            // 画面中央からレイキャスト
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(targets3D);
+            
+            let hitAny = false;
+            
+            if (intersects.length > 0) {
+                const target = intersects[0].object;
+                if (!target.userData.hit) {
+                    hitAny = true;
+                    state.reactionTimes.push(Date.now() - state.lastTargetTime);
+                    hitTarget3D(target);
+                }
+            }
+            
+            state.totalClicks++;
+            if (!hitAny) { state.misses++; playMissSound(); }
+            updateAccuracy();
+            
+            if (hitAny) {
+                if (state.currentMode === 'flick') setTimeout(spawnTarget, 100);
+                if (state.currentMode === 'reaction') scheduleReactionTarget();
+                if (state.currentMode === 'gridshot') {
+                    const remaining = targets3D.filter(t => !t.userData.hit).length;
+                    if (remaining === 0) setTimeout(spawnGridTargets, 200);
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') backToMenu(); });
+
+        function startGame(mode) {
+            state.currentMode = mode;
+            resetState();
+            menuScreen.classList.add('hidden');
+            hud.classList.add('active');
+            escHint.classList.add('active');
+            backBtn.classList.add('active');
+            instructions.classList.add('active');
+            crosshair.classList.add('active');
+            instructions.textContent = modeConfig[mode].instruction;
+            state.waitingForClick = true;
+            clickToStart.classList.add('active');
+        }
+
+        function resetState() {
+            state.score = 0; state.hits = 0; state.misses = 0; state.totalClicks = 0;
+            state.timeLeft = state.gameDuration; state.isPlaying = false;
+            state.reactionTimes = []; state.pitch = 0; state.yaw = 0;
+            clearTargets3D();
+            scoreDisplay.textContent = '0';
+            timeDisplay.textContent = '--'; // カウントダウン中は時間を非表示
+            accuracyDisplay.textContent = '100%';
+            resultOverlay.classList.remove('active');
+            trackingIndicator.classList.remove('active');
+            updateWorld();
+        }
+
+        function startCountdown() {
+            let count = 3;
+            countdown.textContent = count;
+            countdown.classList.add('active');
+            playCountSound();
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) { countdown.textContent = count; playCountSound(); }
+                else { countdown.classList.remove('active'); clearInterval(interval); beginPlay(); }
+            }, 1000);
+        }
+
+        function beginPlay() {
+            state.isPlaying = true;
+            state.lastTargetTime = Date.now();
+            // カウントダウン完了後にタイマー表示開始
+            timeDisplay.textContent = state.timeLeft;
+            state.gameTimer = setInterval(() => {
+                state.timeLeft--;
+                timeDisplay.textContent = state.timeLeft;
+                if (state.timeLeft <= 0) endGame();
+            }, 1000);
+            
+            switch (state.currentMode) {
+                case 'flick': spawnTarget(); break;
+                case 'tracking': startTracking(); break;
+                case 'reaction': scheduleReactionTarget(); break;
+                case 'gridshot': spawnGridTargets(); break;
+            }
+        }
+
+        function getTargetSize() { return modeConfig[state.currentMode].baseSize * state.targetSizeMultiplier; }
+
+        // 3D空間内のランダム位置
+        function getRandomPosition3D() {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 200 + Math.random() * 300;
+            const x = Math.cos(angle) * dist;
+            const y = -100 + Math.random() * 200;
+            const z = -500 - Math.random() * 300;
+            return { x, y, z };
+        }
+
+        function createTarget3D(isTracking = false) {
+            const size = getTargetSize() / 80; // Three.jsスケールに変換
+            const geometry = new THREE.SphereGeometry(size, 32, 32);
+            const material = new THREE.MeshStandardMaterial({
+                color: isTracking ? 0x00ffc2 : 0xff4655,
+                emissive: isTracking ? 0x00aa88 : 0xaa2233,
+                emissiveIntensity: 0.3,
+                metalness: 0.3,
+                roughness: 0.4
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            
+            // グロー効果
+            const glowGeometry = new THREE.SphereGeometry(size * 1.2, 32, 32);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: isTracking ? 0x00ffc2 : 0xff4655,
+                transparent: true,
+                opacity: 0.15
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            sphere.add(glow);
+            
+            sphere.userData = { hit: false, isTracking };
+            return sphere;
+        }
+
+        function spawnTarget() {
+            if (!state.isPlaying) return;
+            clearTargets3D();
+            
+            const target = createTarget3D(false);
+            const pos = getRandomPosition3D();
+            target.position.set(pos.x / 100, pos.y / 100, pos.z / 100);
+            scene.add(target);
+            targets3D.push(target);
+            
+            state.lastTargetTime = Date.now();
+        }
+        
+        function clearTargets3D() {
+            targets3D.forEach(t => scene.remove(t));
+            targets3D.length = 0;
+        }
+
+        function startTracking() {
+            trackingIndicator.classList.add('active');
+            clearTargets3D();
+            
+            const target = createTarget3D(true);
+            scene.add(target);
+            targets3D.push(target);
+            
+            let x = 0, y = 0, z = -6;
+            let vx = (Math.random() - 0.5) * 0.06, vy = (Math.random() - 0.5) * 0.04;
+            let trackingPoints = 0, totalFrames = 0;
+            
+            function move() {
+                if (!state.isPlaying) return;
+                if (Math.random() < 0.02) { vx += (Math.random() - 0.5) * 0.03; vy += (Math.random() - 0.5) * 0.02; }
+                vx = Math.max(-0.05, Math.min(0.05, vx)); vy = Math.max(-0.04, Math.min(0.04, vy));
+                x += vx; y += vy;
+                if (Math.abs(x) > 4) vx *= -1;
+                if (Math.abs(y) > 2) vy *= -1;
+                x = Math.max(-4, Math.min(4, x));
+                y = Math.max(-2, Math.min(2, y));
+                target.position.set(x, y, z);
+                
+                // レイキャストでヒット判定
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                const intersects = raycaster.intersectObject(target);
+                
+                totalFrames++;
+                if (intersects.length > 0) {
+                    trackingPoints++;
+                    state.score = Math.floor(trackingPoints / 2);
+                    scoreDisplay.textContent = state.score;
+                }
+                const acc = totalFrames > 0 ? (trackingPoints / totalFrames) * 100 : 0;
+                trackingFill.style.width = acc + '%';
+                accuracyDisplay.textContent = Math.round(acc) + '%';
+                state.targetTimer = requestAnimationFrame(move);
+            }
+            move();
+        }
+
+        function scheduleReactionTarget() {
+            if (!state.isPlaying) return;
+            clearTargets3D();
+            state.targetTimer = setTimeout(() => {
+                if (!state.isPlaying) return;
+                const target = createTarget3D(false);
+                const pos = getRandomPosition3D();
+                target.position.set(pos.x / 100, pos.y / 100, pos.z / 100);
+                scene.add(target);
+                targets3D.push(target);
+                state.lastTargetTime = Date.now();
+                setTimeout(() => {
+                    if (targets3D.includes(target) && !target.userData.hit) {
+                        scene.remove(target);
+                        targets3D.splice(targets3D.indexOf(target), 1);
+                        state.misses++; state.totalClicks++;
+                        updateAccuracy();
+                        scheduleReactionTarget();
+                    }
+                }, 1000);
+            }, 500 + Math.random() * 1000);
+        }
+
+        function spawnGridTargets() {
+            if (!state.isPlaying) return;
+            clearTargets3D();
+            const positions = [
+                { x: -3.5, y: -1, z: -6 },
+                { x: 3.5, y: -1, z: -6 },
+                { x: 0, y: 1, z: -7 },
+                { x: -2.5, y: 0.5, z: -5 },
+                { x: 2.5, y: 0.5, z: -5 }
+            ];
+            positions.forEach(pos => {
+                const target = createTarget3D(false);
+                target.position.set(pos.x, pos.y, pos.z);
+                scene.add(target);
+                targets3D.push(target);
+            });
+            state.lastTargetTime = Date.now();
+        }
+
+        function hitTarget3D(target) {
+            target.userData.hit = true;
+            showHitMarker();
+            playHitSound();
+            state.hits++;
+            state.score += 100;
+            scoreDisplay.textContent = state.score;
+            
+            // ヒットエフェクト
+            const scale = { value: 1 };
+            const animate = () => {
+                scale.value += 0.1;
+                target.scale.set(scale.value, scale.value, scale.value);
+                target.material.opacity = Math.max(0, 1 - (scale.value - 1) / 0.5);
+                target.material.transparent = true;
+                if (scale.value < 1.5) {
+                    requestAnimationFrame(animate);
+                } else {
+                    scene.remove(target);
+                    const idx = targets3D.indexOf(target);
+                    if (idx > -1) targets3D.splice(idx, 1);
+                }
+            };
+            animate();
+        }
+
+        function showHitMarker() {
+            hitMarker.classList.remove('show');
+            void hitMarker.offsetWidth;
+            hitMarker.classList.add('show');
+        }
+
+        function updateAccuracy() {
+            accuracyDisplay.textContent = state.totalClicks === 0 ? '100%' : 
+                Math.round((state.hits / state.totalClicks) * 100) + '%';
+        }
+
+        function endGame() {
+            state.isPlaying = false;
+            clearInterval(state.gameTimer);
+            clearTimeout(state.targetTimer);
+            cancelAnimationFrame(state.targetTimer);
+            if (document.exitPointerLock) document.exitPointerLock();
+            clearTargets3D();
+            trackingIndicator.classList.remove('active');
+            
+            const avgTime = state.reactionTimes.length > 0 ?
+                Math.round(state.reactionTimes.reduce((a, b) => a + b, 0) / state.reactionTimes.length) : 0;
+            const acc = state.currentMode === 'tracking' ? accuracyDisplay.textContent :
+                (state.totalClicks > 0 ? Math.round((state.hits / state.totalClicks) * 100) + '%' : '100%');
+            
+            // 効率値を計算して表示
+            const accNum = parseFloat(acc) / 100;
+            const efficiency = Math.round(state.score * accNum);
+            
+            document.getElementById('finalScore').textContent = state.score;
+            document.getElementById('finalAccuracy').textContent = acc;
+            document.getElementById('finalAvgTime').textContent = efficiency + ' pts';
+            
+            // 順位を計算して表示（前回の名前を使用）
+            const savedName = localStorage.getItem('deadeyePlayerName') || 'Player';
+            const rank = calculateRank(state.currentMode, efficiency, savedName);
+            const rankValue = document.getElementById('rankValue');
+            const resultRank = document.getElementById('resultRank');
+            
+            if (rank <= 50) {
+                rankValue.textContent = '#' + rank;
+                resultRank.classList.toggle('new-record', rank === 1);
+            } else {
+                rankValue.textContent = '圏外';
+                resultRank.classList.remove('new-record');
+            }
+            
+            // 一時保存用のスコアデータを保持
+            state.pendingScore = {
+                mode: state.currentMode,
+                score: state.score,
+                accuracy: acc
+            };
+            
+            // 前回の名前を復元
+            const playerNameInput = document.getElementById('playerNameInput');
+            playerNameInput.value = savedName || '';
+            
+            // ボタンを無効化してクールダウン表示
+            const retryBtn = document.getElementById('retryBtn');
+            const menuBtn = document.getElementById('menuBtn');
+            const cooldownDiv = document.getElementById('resultCooldown');
+            const cooldownTimer = document.getElementById('cooldownTimer');
+            
+            retryBtn.disabled = true;
+            menuBtn.disabled = true;
+            cooldownDiv.classList.remove('hidden');
+            
+            let countdown = 3;
+            cooldownTimer.textContent = countdown;
+            
+            const cooldownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    cooldownTimer.textContent = countdown;
+                } else {
+                    clearInterval(cooldownInterval);
+                    retryBtn.disabled = false;
+                    menuBtn.disabled = false;
+                    cooldownDiv.classList.add('hidden');
+                }
+            }, 1000);
+            
+            resultOverlay.classList.add('active');
+        }
+
+        function retryGame() {
+            // スコアを保存
+            if (state.pendingScore) {
+                const playerName = document.getElementById('playerNameInput').value;
+                saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, playerName);
+                state.pendingScore = null;
+            }
+            
+            resultOverlay.classList.remove('active');
+            resetState();
+            state.waitingForClick = true;
+            clickToStart.classList.add('active');
+        }
+
+        function backToMenu() {
+            // スコアを保存（リザルト画面からの場合）
+            if (state.pendingScore) {
+                const playerName = document.getElementById('playerNameInput').value;
+                saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, playerName);
+                state.pendingScore = null;
+            }
+            
+            state.isPlaying = false;
+            state.waitingForClick = false;
+            clearInterval(state.gameTimer);
+            clearTimeout(state.targetTimer);
+            cancelAnimationFrame(state.targetTimer);
+            if (document.exitPointerLock) document.exitPointerLock();
+            
+            hud.classList.remove('active');
+            escHint.classList.remove('active');
+            backBtn.classList.remove('active');
+            instructions.classList.remove('active');
+            crosshair.classList.remove('active');
+            resultOverlay.classList.remove('active');
+            trackingIndicator.classList.remove('active');
+            clickToStart.classList.remove('active');
+            countdown.classList.remove('active');
+            menuScreen.classList.remove('hidden');
+            
+            clearTargets3D();
+            state.pitch = 0; state.yaw = 0;
+            updateWorld();
+        }
+    </script>
+</body>
+</html>
