@@ -113,6 +113,44 @@ export default async function handler(req, res) {
     try {
         // GET: ランキング取得
         if (req.method === 'GET') {
+            // テストモード
+            if (req.query.test === 'true') {
+                try {
+                    // Test 1: PING
+                    const pingResult = await upstashCommand(['PING']);
+                    console.log('PING test:', pingResult);
+                    
+                    // Test 2: Check if ranking key exists
+                    const existsResult = await upstashCommand(['EXISTS', 'ranking:flick']);
+                    console.log('EXISTS test:', existsResult);
+                    
+                    // Test 3: Try ZREVRANGE
+                    const zrevrangeResult = await upstashCommand(['ZREVRANGE', 'ranking:flick', '0', '4', 'WITHSCORES']);
+                    console.log('ZREVRANGE test:', zrevrangeResult);
+                    
+                    return res.status(200).json({
+                        test: true,
+                        env: {
+                            url: UPSTASH_URL ? 'Set' : 'Not set',
+                            token: UPSTASH_TOKEN ? 'Set' : 'Not set',
+                            urlPreview: UPSTASH_URL ? UPSTASH_URL.substring(0, 30) + '...' : 'Not set'
+                        },
+                        tests: {
+                            ping: pingResult,
+                            exists: existsResult,
+                            zrevrange: zrevrangeResult
+                        }
+                    });
+                } catch (testError) {
+                    console.error('Test error:', testError);
+                    return res.status(500).json({
+                        test: true,
+                        error: testError.message,
+                        stack: testError.stack
+                    });
+                }
+            }
+            
             const mode = req.query.mode || 'flick';
             const key = `ranking:${mode}`;
             
