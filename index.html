@@ -1235,7 +1235,7 @@
     <button class="settings-btn" id="settingsBtn">⚙</button>
     
     <!-- ランキングボタン -->
-    <button class="ranking-btn" id="rankingBtn">🏆</button>
+    <button class="ranking-btn" id="rankingBtn">🌍</button>
     
     <!-- プリセット保存モーダル -->
     <div class="preset-modal" id="presetModal">
@@ -1281,7 +1281,7 @@
     <!-- ランキングパネル -->
     <div class="ranking-panel" id="rankingPanel">
         <div class="ranking-header">
-            <span class="ranking-title">🏆 RANKING</span>
+            <span class="ranking-title">🌍 WORLD RANKING</span>
             <button class="ranking-close" id="rankingClose">✕</button>
         </div>
         <div class="ranking-tabs">
@@ -2073,6 +2073,12 @@
         // ランキング保存
         // 順位を計算（保存前に呼び出す）
         function calculateRank(mode, efficiency, playerName) {
+            // ランキング条件：サイズ50%、秒数30秒のみ
+            const targetSize = Math.round(state.targetSizeMultiplier * 100);
+            if (targetSize !== 50 || state.gameDuration !== 30) {
+                return 51; // 条件を満たさない場合は圏外
+            }
+            
             const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
             const modeRankings = rankings[mode] || [];
             const name = playerName && playerName.trim() ? playerName.trim() : 'Player';
@@ -2088,9 +2094,12 @@
             return Math.min(rank, 51); // 51位以上は圏外
         }
         
-        function saveScore(mode, score, accuracy, playerName) {
-            const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
-            if (!rankings[mode]) rankings[mode] = [];
+        async function saveScore(mode, score, accuracy, playerName) {
+            // ランキング条件：サイズ50%、秒数30秒のみ
+            const targetSize = Math.round(state.targetSizeMultiplier * 100);
+            if (targetSize !== 50 || state.gameDuration !== 30) {
+                return; // 条件を満たさない場合はランキングに保存しない
+            }
             
             // 効率値 = スコア × 正確さ（%を小数に変換）
             const accNum = parseFloat(accuracy) / 100;
@@ -2098,67 +2107,81 @@
             
             const name = playerName && playerName.trim() ? playerName.trim() : 'Player';
             
-            // 同じ名前のプレイヤーが既に存在するかチェック
-            const existingIndex = rankings[mode].findIndex(r => r.name === name);
+            // 保存したプレイヤー名を記憶
+            localStorage.setItem('deadeyePlayerName', name);
             
-            if (existingIndex !== -1) {
-                // 既存のスコアより高い場合のみ更新
-                if (efficiency > rankings[mode][existingIndex].efficiency) {
-                    rankings[mode][existingIndex] = {
+            // 世界ランキングAPIに送信
+            try {
+                const response = await fetch('/api/ranking', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        mode: mode,
                         name: name,
                         score: score,
                         accuracy: accuracy,
-                        efficiency: efficiency,
-                        duration: state.gameDuration,
-                        targetSize: Math.round(state.targetSizeMultiplier * 100),
-                        date: new Date().toLocaleDateString('ja-JP')
-                    };
-                }
-            } else {
-                // 新規プレイヤーを追加
-                rankings[mode].push({
-                    name: name,
-                    score: score,
-                    accuracy: accuracy,
-                    efficiency: efficiency,
-                    duration: state.gameDuration,
-                    targetSize: Math.round(state.targetSizeMultiplier * 100),
-                    date: new Date().toLocaleDateString('ja-JP')
+                        efficiency: efficiency
+                    })
                 });
+                
+                const result = await response.json();
+                console.log('World ranking saved:', result);
+            } catch (error) {
+                console.error('Failed to save to world ranking:', error);
             }
-            
-            // 効率値でソートして上位50件のみ保存
-            rankings[mode].sort((a, b) => b.efficiency - a.efficiency);
-            rankings[mode] = rankings[mode].slice(0, 50);
-            
-            localStorage.setItem('deadeyeRankings', JSON.stringify(rankings));
-            
-            // 保存したプレイヤー名を記憶
-            localStorage.setItem('deadeyePlayerName', name);
         }
 
         // ランキング表示
-        function displayRanking(mode) {
-            const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
-            const modeRankings = rankings[mode] || [];
+        async function displayRanking(mode) {
+            rankingList.innerHTML = '<div class="ranking-empty">読み込み中...</div>';
             
-            if (modeRankings.length === 0) {
-                rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
-                return;
-            }
-            
-            rankingList.innerHTML = modeRankings.map((r, i) => `
-                <div class="ranking-item">
-                    <div class="ranking-position">#${i + 1}</div>
-                    <div class="ranking-info">
-                        <div class="ranking-name">${r.name || 'Player'}</div>
-                        <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
-                        <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
-                        <div class="ranking-settings">${r.duration || 30}s / 的${r.targetSize || 100}%</div>
+            try {
+                // 世界ランキングをAPIから取得
+                const response = await fetch(`/api/ranking?mode=${mode}`);
+                const data = await response.json();
+                const modeRankings = data.rankings || [];
+                
+                if (modeRankings.length === 0) {
+                    rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
+                    return;
+                }
+                
+                rankingList.innerHTML = modeRankings.map((r, i) => `
+                    <div class="ranking-item">
+                        <div class="ranking-position">#${i + 1}</div>
+                        <div class="ranking-info">
+                            <div class="ranking-name">${r.name || 'Player'}</div>
+                            <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
+                            <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
+                        </div>
+                        <div class="ranking-date">${r.date}</div>
                     </div>
-                    <div class="ranking-date">${r.date}</div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error('Failed to fetch world ranking:', error);
+                // フォールバック：ローカルランキングを表示
+                const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
+                const modeRankings = rankings[mode] || [];
+                
+                if (modeRankings.length === 0) {
+                    rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
+                    return;
+                }
+                
+                rankingList.innerHTML = modeRankings.map((r, i) => `
+                    <div class="ranking-item">
+                        <div class="ranking-position">#${i + 1}</div>
+                        <div class="ranking-info">
+                            <div class="ranking-name">${r.name || 'Player'}</div>
+                            <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
+                            <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
+                        </div>
+                        <div class="ranking-date">${r.date}</div>
+                    </div>
+                `).join('');
+            }
         }
 
         // ポインターロック
