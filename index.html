@@ -2267,7 +2267,13 @@
             } catch (error) {
                 console.error('Failed to fetch world ranking:', error);
                 console.error('Error details:', error.message, error.stack);
-                rankingList.innerHTML = '<div class="ranking-empty">読み込みに失敗しました</div>';
+                
+                // エラーの詳細を表示
+                let errorMessage = '読み込みに失敗しました';
+                if (error.message) {
+                    errorMessage += `<br><small style="color: #ff6b6b;">${error.message}</small>`;
+                }
+                rankingList.innerHTML = `<div class="ranking-empty">${errorMessage}</div>`;
             }
         }
 

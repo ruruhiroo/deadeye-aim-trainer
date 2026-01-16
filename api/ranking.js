@@ -20,23 +20,44 @@ export default async function handler(req, res) {
 
     // Helper function to call Upstash REST API
     async function upstashCommand(command) {
-        const response = await fetch(`${UPSTASH_URL}`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${UPSTASH_TOKEN}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(command)
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Upstash API error:', response.status, errorText);
-            throw new Error(`Upstash API error: ${response.status} ${errorText}`);
+        try {
+            const response = await fetch(`${UPSTASH_URL}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${UPSTASH_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(command)
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Upstash API error:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText,
+                    command: command
+                });
+                throw new Error(`Upstash API error: ${response.status} ${errorText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Upstashのレスポンス形式を確認
+            if (data.error) {
+                console.error('Upstash returned error:', data.error);
+                throw new Error(data.error);
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Upstash command failed:', {
+                error: error.message,
+                command: command,
+                url: UPSTASH_URL
+            });
+            throw error;
         }
-        
-        const data = await response.json();
-        return data;
     }
 
     try {
@@ -45,18 +66,26 @@ export default async function handler(req, res) {
             const mode = req.query.mode || 'flick';
             const key = `ranking:${mode}`;
             
+            console.log('Fetching rankings for mode:', mode, 'key:', key);
+            
             // Get top 50 scores (sorted set, highest first)
             const result = await upstashCommand(['ZREVRANGE', key, '0', '49', 'WITHSCORES']);
             
-            if (!result.result || result.result.length === 0) {
+            console.log('Upstash result:', JSON.stringify(result));
+            
+            // Upstashのレスポンス形式を確認
+            const scores = result.result || result || [];
+            
+            if (!scores || scores.length === 0) {
+                console.log('No rankings found');
                 return res.status(200).json({ rankings: [] });
             }
 
             // Parse results: [name1, score1, name2, score2, ...]
             const rankings = [];
-            for (let i = 0; i < result.result.length; i += 2) {
-                const dataStr = result.result[i];
-                const efficiency = parseInt(result.result[i + 1]);
+            for (let i = 0; i < scores.length; i += 2) {
+                const dataStr = scores[i];
+                const efficiency = parseInt(scores[i + 1]);
                 
                 try {
                     const data = JSON.parse(dataStr);
@@ -93,8 +122,9 @@ export default async function handler(req, res) {
             // Check if player already has a score
             const existingScore = await upstashCommand(['GET', playerKey]);
             
-            if (existingScore.result) {
-                const existing = JSON.parse(existingScore.result);
+            const existingValue = existingScore.result || existingScore;
+            if (existingValue) {
+                const existing = JSON.parse(existingValue);
                 // Only update if new score is higher
                 if (efficiency <= existing.efficiency) {
                     return res.status(200).json({ 
@@ -127,7 +157,8 @@ export default async function handler(req, res) {
 
             // Calculate rank
             const rank = await upstashCommand(['ZREVRANK', key, JSON.stringify(scoreData)]);
-            const playerRank = rank.result !== null ? rank.result + 1 : 51;
+            const rankValue = rank.result !== undefined ? rank.result : rank;
+            const playerRank = rankValue !== null && rankValue !== undefined ? rankValue + 1 : 51;
 
             return res.status(200).json({ 
                 success: true, 
@@ -139,8 +170,17 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
 
     } catch (error) {
-        console.error('API Error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        console.error('API Error:', {
+            message: error.message,
+            stack: error.stack,
+            url: UPSTASH_URL ? 'Set' : 'Not set',
+            token: UPSTASH_TOKEN ? 'Set' : 'Not set'
+        });
+        return res.status(500).json({ 
+            error: 'Internal server error',
+            message: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 }
 
