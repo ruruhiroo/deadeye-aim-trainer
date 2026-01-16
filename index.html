@@ -1308,7 +1308,7 @@
             <button class="ranking-tab" data-mode="tracking" data-type="world">TRACK</button>
             <button class="ranking-tab" data-mode="reaction" data-type="world">REACT</button>
             <button class="ranking-tab" data-mode="gridshot" data-type="world">GRID</button>
-            <button class="ranking-tab ranking-tab-personal" data-mode="flick" data-type="personal">自己</button>
+            <button class="ranking-tab ranking-tab-personal" data-mode="flick" data-type="personal" id="personalRankingTab">自己</button>
         </div>
         <div class="ranking-list" id="rankingList"></div>
     </div>
@@ -1814,6 +1814,7 @@
         function openRanking() {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
+            updatePersonalTabText(); // 自己タブのテキストを更新
             displayRanking(currentRankingMode, currentRankingType);
         }
 
@@ -1825,6 +1826,20 @@
         rankingBtn.addEventListener('click', openRanking);
         rankingClose.addEventListener('click', closeRanking);
         rankingOverlay.addEventListener('click', closeRanking);
+
+        // 自己ランキングタブのテキストを更新する関数
+        function updatePersonalTabText() {
+            const personalTab = document.getElementById('personalRankingTab');
+            if (personalTab) {
+                const modeNames = {
+                    'flick': 'FLICK',
+                    'tracking': 'TRACK',
+                    'reaction': 'REACT',
+                    'gridshot': 'GRID'
+                };
+                personalTab.textContent = `自己 (${modeNames[currentRankingMode] || 'FLICK'})`;
+            }
+        }
 
         // ランキングタブ
         document.querySelectorAll('.ranking-tab').forEach(tab => {
@@ -1847,10 +1862,14 @@
                     tab.classList.add('active');
                     currentRankingMode = tab.dataset.mode;
                     currentRankingType = 'world';
+                    updatePersonalTabText(); // 自己タブのテキストを更新
                     displayRanking(currentRankingMode, currentRankingType);
                 }
             });
         });
+        
+        // 初期化時に自己タブのテキストを更新
+        updatePersonalTabText();
 
         // プリセット機能
         const presetList = document.getElementById('presetList');
@@ -2222,14 +2241,19 @@
                 const modeRankings = (personalRankings[mode] || []).filter(r => r.name === playerName);
                 
                 if (modeRankings.length === 0) {
-                    rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
+                    rankingList.innerHTML = `<div class="ranking-empty">まだ記録がありません<br><small style="color: var(--text-secondary);">プレイヤー名: ${playerName}</small></div>`;
                     return;
                 }
                 
                 // 効率値でソート
                 modeRankings.sort((a, b) => b.efficiency - a.efficiency);
                 
-                rankingList.innerHTML = modeRankings.map((r, i) => `
+                rankingList.innerHTML = `
+                    <div style="padding: 10px 15px; background: rgba(255, 215, 0, 0.1); border-bottom: 1px solid rgba(255, 215, 0, 0.2);">
+                        <div style="color: #FFD700; font-size: 0.9rem; font-weight: bold;">${playerName} の記録</div>
+                        <div style="color: var(--text-secondary); font-size: 0.75rem;">全${modeRankings.length}件</div>
+                    </div>
+                ` + modeRankings.map((r, i) => `
                     <div class="ranking-item">
                         <div class="ranking-position">#${i + 1}</div>
                         <div class="ranking-info">
