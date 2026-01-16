@@ -2126,10 +2126,15 @@
                     })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const result = await response.json();
                 console.log('World ranking saved:', result);
             } catch (error) {
                 console.error('Failed to save to world ranking:', error);
+                console.error('Error details:', error.message, error.stack);
             }
         }
 
@@ -2140,6 +2145,11 @@
             try {
                 // 世界ランキングをAPIから取得
                 const response = await fetch(`/api/ranking?mode=${mode}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 const modeRankings = data.rankings || [];
                 
@@ -2161,6 +2171,7 @@
                 `).join('');
             } catch (error) {
                 console.error('Failed to fetch world ranking:', error);
+                console.error('Error details:', error.message, error.stack);
                 // フォールバック：ローカルランキングを表示
                 const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
                 const modeRankings = rankings[mode] || [];

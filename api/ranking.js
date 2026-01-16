@@ -28,7 +28,15 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify(command)
         });
-        return response.json();
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Upstash API error:', response.status, errorText);
+            throw new Error(`Upstash API error: ${response.status} ${errorText}`);
+        }
+        
+        const data = await response.json();
+        return data;
     }
 
     try {
