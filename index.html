@@ -2192,7 +2192,14 @@
                     });
                     
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        const errorText = await response.text();
+                        let errorData;
+                        try {
+                            errorData = JSON.parse(errorText);
+                        } catch (e) {
+                            errorData = { error: errorText };
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
                     }
                     
                     const result = await response.json();
@@ -2242,7 +2249,14 @@
                 const response = await fetch(`/api/ranking?mode=${mode}`);
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch (e) {
+                        errorData = { error: errorText };
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
                 }
                 
                 const data = await response.json();

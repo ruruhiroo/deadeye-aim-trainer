@@ -2,6 +2,12 @@
 // Uses Upstash Redis
 
 export default async function handler(req, res) {
+    console.log('API called:', {
+        method: req.method,
+        url: req.url,
+        query: req.query
+    });
+    
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -15,7 +21,14 @@ export default async function handler(req, res) {
     const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
     if (!UPSTASH_URL || !UPSTASH_TOKEN) {
-        return res.status(500).json({ error: 'Server configuration error' });
+        console.error('Missing environment variables:', {
+            UPSTASH_URL: !!UPSTASH_URL,
+            UPSTASH_TOKEN: !!UPSTASH_TOKEN
+        });
+        return res.status(500).json({ 
+            error: 'Server configuration error',
+            message: 'Upstash credentials not configured. Please check environment variables.'
+        });
     }
 
     // Helper function to call Upstash REST API
