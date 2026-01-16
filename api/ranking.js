@@ -121,25 +121,38 @@ export default async function handler(req, res) {
             // Get top 50 scores (sorted set, highest first)
             const result = await upstashCommand(['ZREVRANGE', key, '0', '49', 'WITHSCORES']);
             
-            console.log('Upstash result:', JSON.stringify(result));
+            console.log('Upstash result:', JSON.stringify(result, null, 2));
             
             // Upstashのレスポンス形式を確認
             // Upstash REST APIは { result: [...] } の形式で返す
             let scores = [];
-            if (result && typeof result === 'object') {
-                if (Array.isArray(result.result)) {
-                    scores = result.result;
-                } else if (Array.isArray(result)) {
+            if (result) {
+                // result.result が配列の場合
+                if (result.result !== undefined) {
+                    if (Array.isArray(result.result)) {
+                        scores = result.result;
+                    } else {
+                        // result.result が文字列やその他の場合
+                        console.log('result.result is not an array:', typeof result.result, result.result);
+                    }
+                }
+                // result 自体が配列の場合（直接配列が返される場合）
+                else if (Array.isArray(result)) {
                     scores = result;
-                } else if (result.result !== undefined) {
-                    scores = Array.isArray(result.result) ? result.result : [];
                 }
             }
             
-            console.log('Parsed scores:', scores.length, 'items');
+            console.log('Parsed scores:', {
+                count: scores.length,
+                type: Array.isArray(scores) ? 'array' : typeof scores,
+                firstFew: scores.slice(0, 3)
+            });
             
             if (!scores || scores.length === 0) {
                 console.log('No rankings found for key:', key);
+                // デバッグ用：キーが存在するか確認
+                const exists = await upstashCommand(['EXISTS', key]);
+                console.log('Key exists check:', exists);
                 return res.status(200).json({ rankings: [] });
             }
 
@@ -227,9 +240,19 @@ export default async function handler(req, res) {
             console.log('SET result:', setResult);
 
             console.log('Trimming to top 50');
-            // Trim to top 50
-            const trimResult = await upstashCommand(['ZREMRANGEBYRANK', key, '0', '-51']);
-            console.log('Trim result:', trimResult);
+            // Trim to top 50 (keep top 50, remove the rest)
+            // ZREMRANGEBYRANK removes by rank index (0-based, ascending order)
+            // Since we use ZREVRANGE (descending), we need to remove from the end
+            // To keep top 50, remove ranks 50 onwards (0-indexed, so 50-49 = keep 50 items)
+            // ZREMRANGEBYRANK key 50 -1 removes from index 50 to the end
+            const currentCount = await upstashCommand(['ZCARD', key]);
+            console.log('Current count before trim:', currentCount);
+            if (currentCount && (currentCount.result || currentCount) > 50) {
+                const trimResult = await upstashCommand(['ZREMRANGEBYRANK', key, '50', '-1']);
+                console.log('Trim result:', trimResult);
+            } else {
+                console.log('No need to trim, count is:', currentCount);
+            }
 
             console.log('Calculating rank');
             // Calculate rank
@@ -239,6 +262,11 @@ export default async function handler(req, res) {
             const playerRank = rankValue !== null && rankValue !== undefined ? rankValue + 1 : 51;
 
             console.log('Score saved successfully, rank:', playerRank);
+            
+            // デバッグ用：保存後にすぐ取得して確認
+            const verifyResult = await upstashCommand(['ZREVRANGE', key, '0', '4', 'WITHSCORES']);
+            console.log('Verification - top 5 scores after save:', verifyResult);
+            
             return res.status(200).json({ 
                 success: true, 
                 rank: playerRank,
