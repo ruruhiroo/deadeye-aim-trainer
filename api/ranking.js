@@ -34,7 +34,24 @@ export default async function handler(req, res) {
     // Helper function to call Upstash REST API
     async function upstashCommand(command) {
         try {
-            const response = await fetch(`${UPSTASH_URL}`, {
+            // Upstash REST API endpoint
+            // 環境変数のURLがそのまま使える場合と、/restが必要な場合がある
+            let apiUrl = UPSTASH_URL;
+            
+            // URLに/restが含まれていない場合、追加を試みる
+            // ただし、まず元のURLで試して、失敗したら/restを追加する方法もある
+            // ここでは、Upstashの標準的な形式として/restを追加
+            if (!apiUrl.includes('/rest')) {
+                apiUrl = apiUrl.endsWith('/') ? `${apiUrl}rest` : `${apiUrl}/rest`;
+            }
+            
+            console.log('Calling Upstash API:', {
+                url: apiUrl,
+                command: command,
+                originalUrl: UPSTASH_URL
+            });
+            
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${UPSTASH_TOKEN}`,
@@ -43,18 +60,33 @@ export default async function handler(req, res) {
                 body: JSON.stringify(command)
             });
             
+            const responseText = await response.text();
+            console.log('Upstash API raw response:', {
+                status: response.status,
+                statusText: response.statusText,
+                body: responseText
+            });
+            
             if (!response.ok) {
-                const errorText = await response.text();
                 console.error('Upstash API error:', {
                     status: response.status,
                     statusText: response.statusText,
-                    error: errorText,
-                    command: command
+                    error: responseText,
+                    command: command,
+                    url: apiUrl
                 });
-                throw new Error(`Upstash API error: ${response.status} ${errorText}`);
+                throw new Error(`Upstash API error: ${response.status} ${responseText}`);
             }
             
-            const data = await response.json();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                console.error('Failed to parse Upstash response as JSON:', responseText);
+                throw new Error(`Invalid JSON response from Upstash: ${responseText}`);
+            }
+            
+            console.log('Upstash API parsed response:', data);
             
             // Upstashのレスポンス形式を確認
             if (data.error) {
@@ -66,6 +98,7 @@ export default async function handler(req, res) {
         } catch (error) {
             console.error('Upstash command failed:', {
                 error: error.message,
+                stack: error.stack,
                 command: command,
                 url: UPSTASH_URL
             });
@@ -87,10 +120,22 @@ export default async function handler(req, res) {
             console.log('Upstash result:', JSON.stringify(result));
             
             // Upstashのレスポンス形式を確認
-            const scores = result.result || result || [];
+            // Upstash REST APIは { result: [...] } の形式で返す
+            let scores = [];
+            if (result && typeof result === 'object') {
+                if (Array.isArray(result.result)) {
+                    scores = result.result;
+                } else if (Array.isArray(result)) {
+                    scores = result;
+                } else if (result.result !== undefined) {
+                    scores = Array.isArray(result.result) ? result.result : [];
+                }
+            }
+            
+            console.log('Parsed scores:', scores.length, 'items');
             
             if (!scores || scores.length === 0) {
-                console.log('No rankings found');
+                console.log('No rankings found for key:', key);
                 return res.status(200).json({ rankings: [] });
             }
 
