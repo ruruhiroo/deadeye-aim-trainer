@@ -454,6 +454,11 @@
             box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
 
+        .ranking-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
         .offline-ranking-btn {
             top: 140px;
             border-color: rgba(255, 193, 7, 0.3);
@@ -547,17 +552,19 @@
 
         .ranking-tabs {
             display: flex;
+            flex-wrap: wrap;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .ranking-tab {
             flex: 1;
-            padding: 10px;
+            min-width: 80px;
+            padding: 8px 6px;
             background: none;
             border: none;
             color: var(--text-secondary);
             font-family: 'Orbitron', sans-serif;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -1267,7 +1274,13 @@
     <button class="settings-btn" id="settingsBtn">⚙</button>
     
     <!-- ランキングボタン -->
-    <button class="ranking-btn" id="rankingBtn">🌍</button>
+    <button class="ranking-btn" id="rankingBtn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M2 12h20"></path>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+    </button>
     
     <!-- オフラインランキングボタン -->
     <button class="ranking-btn offline-ranking-btn" id="offlineRankingBtn">
@@ -1336,7 +1349,10 @@
             <button class="ranking-tab" data-mode="tracking" data-type="world">TRACK</button>
             <button class="ranking-tab" data-mode="reaction" data-type="world">REACT</button>
             <button class="ranking-tab" data-mode="gridshot" data-type="world">GRID</button>
-            <button class="ranking-tab ranking-tab-offline" data-mode="flick" data-type="offline" id="offlineRankingTab">オフライン</button>
+            <button class="ranking-tab ranking-tab-offline" data-mode="flick" data-type="offline" data-offline-mode="flick">オフライン FLICK</button>
+            <button class="ranking-tab ranking-tab-offline" data-mode="tracking" data-type="offline" data-offline-mode="tracking">オフライン TRACK</button>
+            <button class="ranking-tab ranking-tab-offline" data-mode="reaction" data-type="offline" data-offline-mode="reaction">オフライン REACT</button>
+            <button class="ranking-tab ranking-tab-offline" data-mode="gridshot" data-type="offline" data-offline-mode="gridshot">オフライン GRID</button>
         </div>
         <div class="ranking-list" id="rankingList"></div>
     </div>
@@ -1842,7 +1858,6 @@
         function openRanking() {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
-            updateOfflineTabText(); // オフラインタブのテキストを更新
             displayRanking(currentRankingMode, currentRankingType);
         }
 
@@ -1860,31 +1875,18 @@
         offlineRankingBtn.addEventListener('click', () => {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
-            // 世界ランキングタブを非アクティブにして、オフラインタブをアクティブに
+            // 世界ランキングタブを非アクティブにして、現在のモードのオフラインタブをアクティブに
             document.querySelectorAll('.ranking-tab').forEach(t => {
                 t.classList.remove('active');
-                if (t.dataset.type === 'offline') {
+                if (t.dataset.type === 'offline' && (t.dataset.offlineMode || t.dataset.mode) === currentRankingMode) {
                     t.classList.add('active');
                 }
             });
             currentRankingType = 'offline';
-            updateOfflineTabText();
             displayRanking(currentRankingMode, currentRankingType);
         });
 
         // 自己ランキングタブのテキストを更新する関数
-        function updateOfflineTabText() {
-            const offlineTab = document.getElementById('offlineRankingTab');
-            if (offlineTab) {
-                const modeNames = {
-                    'flick': 'FLICK',
-                    'tracking': 'TRACK',
-                    'reaction': 'REACT',
-                    'gridshot': 'GRID'
-                };
-                offlineTab.textContent = `オフライン (${modeNames[currentRankingMode] || 'FLICK'})`;
-            }
-        }
 
         // ランキングタブ
         document.querySelectorAll('.ranking-tab').forEach(tab => {
@@ -1892,9 +1894,11 @@
                 const tabType = tab.dataset.type || 'world';
                 
                 if (tabType === 'offline') {
-                    // オフラインランキングタブ：現在のモードでオフラインランキングを表示
+                    // オフラインランキングタブ：指定されたモードでオフラインランキングを表示
                     document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
+                    const offlineMode = tab.dataset.offlineMode || tab.dataset.mode;
+                    currentRankingMode = offlineMode;
                     currentRankingType = 'offline';
                     displayRanking(currentRankingMode, currentRankingType);
                 } else {
@@ -1907,14 +1911,11 @@
                     tab.classList.add('active');
                     currentRankingMode = tab.dataset.mode;
                     currentRankingType = 'world';
-                    updateOfflineTabText(); // オフラインタブのテキストを更新
                     displayRanking(currentRankingMode, currentRankingType);
                 }
             });
         });
         
-        // 初期化時にオフラインタブのテキストを更新
-        updateOfflineTabText();
 
         // プリセット機能
         const presetList = document.getElementById('presetList');
