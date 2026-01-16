@@ -454,6 +454,17 @@
             box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
 
+        .personal-ranking-btn {
+            top: 140px;
+            border-color: rgba(0, 200, 255, 0.3);
+            color: #00C8FF;
+        }
+
+        .personal-ranking-btn:hover {
+            border-color: #00C8FF;
+            box-shadow: 0 0 15px rgba(0, 200, 255, 0.3);
+        }
+
         .ranking-overlay {
             position: fixed;
             top: 0;
@@ -1253,6 +1264,9 @@
     <!-- ランキングボタン -->
     <button class="ranking-btn" id="rankingBtn">🌍</button>
     
+    <!-- 自己ランキングボタン -->
+    <button class="ranking-btn personal-ranking-btn" id="personalRankingBtn">👤</button>
+    
     <!-- プリセット保存モーダル -->
     <div class="preset-modal" id="presetModal">
         <div class="preset-modal-content">
@@ -1826,6 +1840,23 @@
         rankingBtn.addEventListener('click', openRanking);
         rankingClose.addEventListener('click', closeRanking);
         rankingOverlay.addEventListener('click', closeRanking);
+
+        // 自己ランキングボタン
+        const personalRankingBtn = document.getElementById('personalRankingBtn');
+        personalRankingBtn.addEventListener('click', () => {
+            rankingPanel.classList.add('open');
+            rankingOverlay.classList.add('open');
+            // 世界ランキングタブを非アクティブにして、自己タブをアクティブに
+            document.querySelectorAll('.ranking-tab').forEach(t => {
+                t.classList.remove('active');
+                if (t.dataset.type === 'personal') {
+                    t.classList.add('active');
+                }
+            });
+            currentRankingType = 'personal';
+            updatePersonalTabText();
+            displayRanking(currentRankingMode, currentRankingType);
+        });
 
         // 自己ランキングタブのテキストを更新する関数
         function updatePersonalTabText() {
