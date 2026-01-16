@@ -454,15 +454,20 @@
             box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
 
-        .personal-ranking-btn {
+        .offline-ranking-btn {
             top: 140px;
-            border-color: rgba(0, 200, 255, 0.3);
-            color: #00C8FF;
+            border-color: rgba(255, 193, 7, 0.3);
+            color: #FFC107;
         }
 
-        .personal-ranking-btn:hover {
-            border-color: #00C8FF;
-            box-shadow: 0 0 15px rgba(0, 200, 255, 0.3);
+        .offline-ranking-btn:hover {
+            border-color: #FFC107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+        }
+
+        .offline-ranking-btn svg {
+            width: 24px;
+            height: 24px;
         }
 
         .ranking-overlay {
@@ -566,8 +571,8 @@
             border-bottom: 2px solid #FFD700;
         }
 
-        .ranking-tab-personal {
-            border-left: 2px solid rgba(255, 255, 255, 0.2);
+        .ranking-tab-offline {
+            border-left: 2px solid rgba(255, 193, 7, 0.3);
             margin-left: 5px;
             padding-left: 15px;
         }
@@ -1264,8 +1269,17 @@
     <!-- ランキングボタン -->
     <button class="ranking-btn" id="rankingBtn">🌍</button>
     
-    <!-- 自己ランキングボタン -->
-    <button class="ranking-btn personal-ranking-btn" id="personalRankingBtn">👤</button>
+    <!-- オフラインランキングボタン -->
+    <button class="ranking-btn offline-ranking-btn" id="offlineRankingBtn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+            <path d="M4 22h16"></path>
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+        </svg>
+    </button>
     
     <!-- プリセット保存モーダル -->
     <div class="preset-modal" id="presetModal">
@@ -1322,7 +1336,7 @@
             <button class="ranking-tab" data-mode="tracking" data-type="world">TRACK</button>
             <button class="ranking-tab" data-mode="reaction" data-type="world">REACT</button>
             <button class="ranking-tab" data-mode="gridshot" data-type="world">GRID</button>
-            <button class="ranking-tab ranking-tab-personal" data-mode="flick" data-type="personal" id="personalRankingTab">自己</button>
+            <button class="ranking-tab ranking-tab-offline" data-mode="flick" data-type="offline" id="offlineRankingTab">オフライン</button>
         </div>
         <div class="ranking-list" id="rankingList"></div>
     </div>
@@ -1828,7 +1842,7 @@
         function openRanking() {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
-            updatePersonalTabText(); // 自己タブのテキストを更新
+            updateOfflineTabText(); // オフラインタブのテキストを更新
             displayRanking(currentRankingMode, currentRankingType);
         }
 
@@ -1841,34 +1855,34 @@
         rankingClose.addEventListener('click', closeRanking);
         rankingOverlay.addEventListener('click', closeRanking);
 
-        // 自己ランキングボタン
-        const personalRankingBtn = document.getElementById('personalRankingBtn');
-        personalRankingBtn.addEventListener('click', () => {
+        // オフラインランキングボタン
+        const offlineRankingBtn = document.getElementById('offlineRankingBtn');
+        offlineRankingBtn.addEventListener('click', () => {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
-            // 世界ランキングタブを非アクティブにして、自己タブをアクティブに
+            // 世界ランキングタブを非アクティブにして、オフラインタブをアクティブに
             document.querySelectorAll('.ranking-tab').forEach(t => {
                 t.classList.remove('active');
-                if (t.dataset.type === 'personal') {
+                if (t.dataset.type === 'offline') {
                     t.classList.add('active');
                 }
             });
-            currentRankingType = 'personal';
-            updatePersonalTabText();
+            currentRankingType = 'offline';
+            updateOfflineTabText();
             displayRanking(currentRankingMode, currentRankingType);
         });
 
         // 自己ランキングタブのテキストを更新する関数
-        function updatePersonalTabText() {
-            const personalTab = document.getElementById('personalRankingTab');
-            if (personalTab) {
+        function updateOfflineTabText() {
+            const offlineTab = document.getElementById('offlineRankingTab');
+            if (offlineTab) {
                 const modeNames = {
                     'flick': 'FLICK',
                     'tracking': 'TRACK',
                     'reaction': 'REACT',
                     'gridshot': 'GRID'
                 };
-                personalTab.textContent = `自己 (${modeNames[currentRankingMode] || 'FLICK'})`;
+                offlineTab.textContent = `オフライン (${modeNames[currentRankingMode] || 'FLICK'})`;
             }
         }
 
@@ -1877,11 +1891,11 @@
             tab.addEventListener('click', () => {
                 const tabType = tab.dataset.type || 'world';
                 
-                if (tabType === 'personal') {
-                    // 自己ランキングタブ：現在のモードで自己ランキングを表示
+                if (tabType === 'offline') {
+                    // オフラインランキングタブ：現在のモードでオフラインランキングを表示
                     document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
-                    currentRankingType = 'personal';
+                    currentRankingType = 'offline';
                     displayRanking(currentRankingMode, currentRankingType);
                 } else {
                     // 世界ランキングタブ：モードを変更
@@ -1893,14 +1907,14 @@
                     tab.classList.add('active');
                     currentRankingMode = tab.dataset.mode;
                     currentRankingType = 'world';
-                    updatePersonalTabText(); // 自己タブのテキストを更新
+                    updateOfflineTabText(); // オフラインタブのテキストを更新
                     displayRanking(currentRankingMode, currentRankingType);
                 }
             });
         });
         
-        // 初期化時に自己タブのテキストを更新
-        updatePersonalTabText();
+        // 初期化時にオフラインタブのテキストを更新
+        updateOfflineTabText();
 
         // プリセット機能
         const presetList = document.getElementById('presetList');
@@ -2265,14 +2279,13 @@
         async function displayRanking(mode, type = 'world') {
             rankingList.innerHTML = '<div class="ranking-empty">読み込み中...</div>';
             
-            // 自己ランキングの場合
-            if (type === 'personal') {
-                const playerName = localStorage.getItem('deadeyePlayerName') || 'Player';
+            // オフラインランキングの場合（ローカルストレージの全スコア）
+            if (type === 'offline') {
                 const personalRankings = JSON.parse(localStorage.getItem('deadeyePersonalRankings') || '{}');
-                const modeRankings = (personalRankings[mode] || []).filter(r => r.name === playerName);
+                const modeRankings = personalRankings[mode] || [];
                 
                 if (modeRankings.length === 0) {
-                    rankingList.innerHTML = `<div class="ranking-empty">まだ記録がありません<br><small style="color: var(--text-secondary);">プレイヤー名: ${playerName}</small></div>`;
+                    rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
                     return;
                 }
                 
@@ -2280,9 +2293,9 @@
                 modeRankings.sort((a, b) => b.efficiency - a.efficiency);
                 
                 rankingList.innerHTML = `
-                    <div style="padding: 10px 15px; background: rgba(255, 215, 0, 0.1); border-bottom: 1px solid rgba(255, 215, 0, 0.2);">
-                        <div style="color: #FFD700; font-size: 0.9rem; font-weight: bold;">${playerName} の記録</div>
-                        <div style="color: var(--text-secondary); font-size: 0.75rem;">全${modeRankings.length}件</div>
+                    <div style="padding: 10px 15px; background: rgba(255, 193, 7, 0.1); border-bottom: 1px solid rgba(255, 193, 7, 0.2);">
+                        <div style="color: #FFC107; font-size: 0.9rem; font-weight: bold;">オフラインランキング</div>
+                        <div style="color: var(--text-secondary); font-size: 0.75rem;">全${modeRankings.length}件（条件に関係なく全て表示）</div>
                     </div>
                 ` + modeRankings.map((r, i) => `
                     <div class="ranking-item">
