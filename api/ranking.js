@@ -2,10 +2,15 @@
 // Uses Upstash Redis
 
 export default async function handler(req, res) {
+    // URLからクエリパラメータをパース
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const queryParams = Object.fromEntries(url.searchParams);
+    
     console.log('API called:', {
         method: req.method,
         url: req.url,
-        query: req.query
+        query: req.query,
+        parsedQuery: queryParams
     });
     
     // CORS headers
@@ -113,14 +118,17 @@ export default async function handler(req, res) {
     try {
         // GET: ランキング取得
         if (req.method === 'GET') {
+            // テストモード
+            const isTestMode = queryParams.test === 'true' || req.query?.test === 'true' || req.url?.includes('test=true');
+            
             console.log('GET request:', {
                 query: req.query,
+                parsedQuery: queryParams,
                 url: req.url,
-                test: req.query?.test
+                isTestMode: isTestMode
             });
             
-            // テストモード
-            if (req.query?.test === 'true' || req.url?.includes('test=true')) {
+            if (isTestMode) {
                 try {
                     // Test 1: PING
                     const pingResult = await upstashCommand(['PING']);
@@ -157,7 +165,7 @@ export default async function handler(req, res) {
                 }
             }
             
-            const mode = req.query.mode || 'flick';
+            const mode = queryParams.mode || req.query?.mode || 'flick';
             const key = `ranking:${mode}`;
             
             console.log('Fetching rankings for mode:', mode, 'key:', key);
