@@ -2,15 +2,25 @@
 // Uses Upstash Redis
 
 export default async function handler(req, res) {
-    // URLからクエリパラメータをパース
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const queryParams = Object.fromEntries(url.searchParams);
+    // URLを直接チェック（VercelのServerless Functionsでは req.query が正しく動作しない場合がある）
+    const isTestMode = req.url?.includes('test=true') || req.url?.includes('?test=true');
+    
+    // URLからクエリパラメータをパース（mode取得用）
+    let queryParams = {};
+    try {
+        const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        queryParams = Object.fromEntries(url.searchParams);
+    } catch (e) {
+        // URLパースに失敗した場合は req.query を使用
+        queryParams = req.query || {};
+    }
     
     console.log('API called:', {
         method: req.method,
         url: req.url,
         query: req.query,
-        parsedQuery: queryParams
+        parsedQuery: queryParams,
+        isTestMode: isTestMode
     });
     
     // CORS headers
@@ -118,9 +128,6 @@ export default async function handler(req, res) {
     try {
         // GET: ランキング取得
         if (req.method === 'GET') {
-            // テストモード
-            const isTestMode = queryParams.test === 'true' || req.query?.test === 'true' || req.url?.includes('test=true');
-            
             console.log('GET request:', {
                 query: req.query,
                 parsedQuery: queryParams,
