@@ -123,29 +123,37 @@ export default async function handler(req, res) {
 
         // POST: スコア保存
         if (req.method === 'POST') {
+            console.log('POST request received:', req.body);
             const { mode, name, score, accuracy, efficiency } = req.body;
 
             if (!mode || !name || score === undefined || !accuracy || efficiency === undefined) {
+                console.error('Missing required fields:', { mode, name, score, accuracy, efficiency });
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
             const key = `ranking:${mode}`;
             const playerKey = `player:${mode}:${name}`;
             
+            console.log('Saving score:', { key, playerKey, efficiency });
+            
             // Check if player already has a score
             const existingScore = await upstashCommand(['GET', playerKey]);
+            console.log('Existing score check:', existingScore);
             
             const existingValue = existingScore.result || existingScore;
             if (existingValue) {
+                console.log('Existing score found:', existingValue);
                 const existing = JSON.parse(existingValue);
                 // Only update if new score is higher
                 if (efficiency <= existing.efficiency) {
+                    console.log('New score is not higher, skipping update');
                     return res.status(200).json({ 
                         success: true, 
                         message: 'Score not updated (existing score is higher)',
                         updated: false
                     });
                 }
+                console.log('Removing old score from sorted set');
                 // Remove old score from sorted set
                 await upstashCommand(['ZREM', key, JSON.stringify(existing)]);
             }
@@ -159,20 +167,29 @@ export default async function handler(req, res) {
                 date: new Date().toLocaleDateString('ja-JP')
             };
 
+            console.log('Adding score to sorted set:', scoreData);
             // Add to sorted set (score = efficiency for sorting)
-            await upstashCommand(['ZADD', key, efficiency, JSON.stringify(scoreData)]);
+            const addResult = await upstashCommand(['ZADD', key, efficiency, JSON.stringify(scoreData)]);
+            console.log('ZADD result:', addResult);
             
+            console.log('Saving player best score');
             // Save player's best score
-            await upstashCommand(['SET', playerKey, JSON.stringify(scoreData)]);
+            const setResult = await upstashCommand(['SET', playerKey, JSON.stringify(scoreData)]);
+            console.log('SET result:', setResult);
 
+            console.log('Trimming to top 50');
             // Trim to top 50
-            await upstashCommand(['ZREMRANGEBYRANK', key, '0', '-51']);
+            const trimResult = await upstashCommand(['ZREMRANGEBYRANK', key, '0', '-51']);
+            console.log('Trim result:', trimResult);
 
+            console.log('Calculating rank');
             // Calculate rank
             const rank = await upstashCommand(['ZREVRANK', key, JSON.stringify(scoreData)]);
+            console.log('Rank result:', rank);
             const rankValue = rank.result !== undefined ? rank.result : rank;
             const playerRank = rankValue !== null && rankValue !== undefined ? rankValue + 1 : 51;
 
+            console.log('Score saved successfully, rank:', playerRank);
             return res.status(200).json({ 
                 success: true, 
                 rank: playerRank,

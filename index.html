@@ -2240,6 +2240,14 @@
             
             // 世界ランキング条件：サイズ50%、秒数30秒のみ
             if (targetSize === 50 && state.gameDuration === 30) {
+                console.log('Attempting to save to world ranking:', {
+                    mode: mode,
+                    name: name,
+                    score: score,
+                    accuracy: accuracy,
+                    efficiency: efficiency
+                });
+                
                 // 世界ランキングAPIに送信
                 try {
                     const response = await fetch('/api/ranking', {
@@ -2256,6 +2264,8 @@
                         })
                     });
                     
+                    console.log('World ranking API response status:', response.status);
+                    
                     if (!response.ok) {
                         const errorText = await response.text();
                         let errorData;
@@ -2264,15 +2274,27 @@
                         } catch (e) {
                             errorData = { error: errorText };
                         }
+                        console.error('World ranking API error:', {
+                            status: response.status,
+                            error: errorData
+                        });
                         throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
                     }
                     
                     const result = await response.json();
-                    console.log('World ranking saved:', result);
+                    console.log('World ranking saved successfully:', result);
                 } catch (error) {
                     console.error('Failed to save to world ranking:', error);
                     console.error('Error details:', error.message, error.stack);
+                    // エラーをユーザーに通知（オプション）
+                    // alert('世界ランキングへの保存に失敗しました: ' + error.message);
                 }
+            } else {
+                console.log('World ranking conditions not met:', {
+                    targetSize: targetSize,
+                    gameDuration: state.gameDuration,
+                    required: '50% and 30s'
+                });
             }
         }
 
