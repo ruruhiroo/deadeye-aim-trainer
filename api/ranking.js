@@ -35,20 +35,12 @@ export default async function handler(req, res) {
     async function upstashCommand(command) {
         try {
             // Upstash REST API endpoint
-            // 環境変数のURLがそのまま使える場合と、/restが必要な場合がある
-            let apiUrl = UPSTASH_URL;
-            
-            // URLに/restが含まれていない場合、追加を試みる
-            // ただし、まず元のURLで試して、失敗したら/restを追加する方法もある
-            // ここでは、Upstashの標準的な形式として/restを追加
-            if (!apiUrl.includes('/rest')) {
-                apiUrl = apiUrl.endsWith('/') ? `${apiUrl}rest` : `${apiUrl}/rest`;
-            }
+            // 環境変数のURLをそのまま使用（Upstashの環境変数には完全なURLが含まれている）
+            const apiUrl = UPSTASH_URL;
             
             console.log('Calling Upstash API:', {
                 url: apiUrl,
-                command: command,
-                originalUrl: UPSTASH_URL
+                command: command
             });
             
             const response = await fetch(apiUrl, {
@@ -64,7 +56,7 @@ export default async function handler(req, res) {
             console.log('Upstash API raw response:', {
                 status: response.status,
                 statusText: response.statusText,
-                body: responseText
+                body: responseText.substring(0, 500) // 長すぎる場合は切り詰め
             });
             
             if (!response.ok) {
@@ -73,9 +65,21 @@ export default async function handler(req, res) {
                     statusText: response.statusText,
                     error: responseText,
                     command: command,
-                    url: apiUrl
+                    url: apiUrl,
+                    hasToken: !!UPSTASH_TOKEN
                 });
-                throw new Error(`Upstash API error: ${response.status} ${responseText}`);
+                
+                // より分かりやすいエラーメッセージ
+                let errorMessage = `Upstash API error (${response.status})`;
+                if (response.status === 401) {
+                    errorMessage = 'Upstash認証エラー: トークンが無効です';
+                } else if (response.status === 404) {
+                    errorMessage = 'Upstash APIエンドポイントが見つかりません';
+                } else if (response.status >= 500) {
+                    errorMessage = 'Upstashサーバーエラー';
+                }
+                
+                throw new Error(`${errorMessage}: ${responseText.substring(0, 200)}`);
             }
             
             let data;
