@@ -113,8 +113,14 @@ export default async function handler(req, res) {
     try {
         // GET: ランキング取得
         if (req.method === 'GET') {
+            console.log('GET request:', {
+                query: req.query,
+                url: req.url,
+                test: req.query?.test
+            });
+            
             // テストモード
-            if (req.query.test === 'true') {
+            if (req.query?.test === 'true' || req.url?.includes('test=true')) {
                 try {
                     // Test 1: PING
                     const pingResult = await upstashCommand(['PING']);
