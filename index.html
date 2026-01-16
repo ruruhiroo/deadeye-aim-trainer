@@ -2076,7 +2076,7 @@
             // ランキング条件：サイズ50%、秒数30秒のみ
             const targetSize = Math.round(state.targetSizeMultiplier * 100);
             if (targetSize !== 50 || state.gameDuration !== 30) {
-                return 51; // 条件を満たさない場合は圏外
+                return -1; // 条件を満たさない場合は条件不適合
             }
             
             const rankings = JSON.parse(localStorage.getItem('deadeyeRankings') || '{}');
@@ -2091,7 +2091,7 @@
                     rank++;
                 }
             }
-            return Math.min(rank, 51); // 51位以上は圏外
+            return Math.min(rank, 51); // 51位以上は圏外（-1は条件不適合）
         }
         
         async function saveScore(mode, score, accuracy, playerName) {
@@ -2539,7 +2539,10 @@
             const rankValue = document.getElementById('rankValue');
             const resultRank = document.getElementById('resultRank');
             
-            if (rank <= 50) {
+            if (rank === -1) {
+                rankValue.textContent = '条件不適合';
+                resultRank.classList.remove('new-record');
+            } else if (rank <= 50) {
                 rankValue.textContent = '#' + rank;
                 resultRank.classList.toggle('new-record', rank === 1);
             } else {
