@@ -1334,6 +1334,23 @@
         </div>
     </div>
     
+    <!-- トラッキング速度設定モーダル -->
+    <div class="preset-modal" id="trackingSpeedModal">
+        <div class="preset-modal-content">
+            <div class="preset-modal-title">トラッキング速度を設定</div>
+            <div class="preset-settings">
+                <div class="preset-setting-item">
+                    <label>トラッキング速度</label>
+                    <input type="range" id="trackingSpeedModalSlider" min="25" max="200" step="5" value="100">
+                    <span id="trackingSpeedModalValue">100%</span>
+                </div>
+            </div>
+            <div class="preset-modal-buttons">
+                <button class="preset-modal-btn save" id="trackingSpeedConfirmBtn">開始</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- 設定オーバーレイ -->
     <div class="settings-overlay" id="settingsOverlay"></div>
     
@@ -1389,12 +1406,6 @@
             <div class="setting-item">
                 <div class="setting-label">ゲーム時間<span class="setting-value" id="durationValue">30s</span></div>
                 <input type="range" class="setting-slider" id="durationSlider" min="15" max="60" step="5" value="30">
-            </div>
-            
-            <!-- トラッキング速度（トラッキングモードのみ） -->
-            <div class="setting-item" id="trackingSpeedSetting" style="display: none;">
-                <div class="setting-label">トラッキング速度<span class="setting-value" id="trackingSpeedValue">100%</span></div>
-                <input type="range" class="setting-slider" id="trackingSpeedSlider" min="25" max="200" step="5" value="100">
             </div>
             
             <!-- マウス反転 -->
@@ -1740,14 +1751,39 @@
             document.getElementById('durationValue').textContent = e.target.value + 's';
         });
         
-        // トラッキング速度スライダー
-        const trackingSpeedSlider = document.getElementById('trackingSpeedSlider');
-        const trackingSpeedValue = document.getElementById('trackingSpeedValue');
-        const trackingSpeedSetting = document.getElementById('trackingSpeedSetting');
+        // トラッキング速度設定モーダル
+        const trackingSpeedModal = document.getElementById('trackingSpeedModal');
+        const trackingSpeedModalSlider = document.getElementById('trackingSpeedModalSlider');
+        const trackingSpeedModalValue = document.getElementById('trackingSpeedModalValue');
+        const trackingSpeedConfirmBtn = document.getElementById('trackingSpeedConfirmBtn');
         
-        trackingSpeedSlider.addEventListener('input', (e) => {
-            state.trackingSpeed = parseInt(e.target.value) / 100;
-            trackingSpeedValue.textContent = e.target.value + '%';
+        trackingSpeedModalSlider.addEventListener('input', (e) => {
+            trackingSpeedModalValue.textContent = e.target.value + '%';
+        });
+        
+        function openTrackingSpeedModal() {
+            trackingSpeedModalSlider.value = state.trackingSpeed * 100;
+            trackingSpeedModalValue.textContent = Math.round(state.trackingSpeed * 100) + '%';
+            trackingSpeedModal.classList.add('active');
+        }
+        
+        function closeTrackingSpeedModal() {
+            trackingSpeedModal.classList.remove('active');
+        }
+        
+        trackingSpeedConfirmBtn.addEventListener('click', () => {
+            state.trackingSpeed = parseInt(trackingSpeedModalSlider.value) / 100;
+            closeTrackingSpeedModal();
+            // ゲームを開始
+            menuScreen.classList.add('hidden');
+            hud.classList.add('active');
+            escHint.classList.add('active');
+            backBtn.classList.add('active');
+            instructions.classList.add('active');
+            crosshair.classList.add('active');
+            instructions.textContent = modeConfig[state.currentMode].instruction;
+            state.waitingForClick = true;
+            clickToStart.classList.add('active');
         });
         document.getElementById('invertXCheckbox').addEventListener('change', (e) => {
             state.invertX = e.target.checked;
@@ -1857,12 +1893,6 @@
         function openSettings() {
             settingsPanel.classList.add('open');
             settingsOverlay.classList.add('open');
-            // トラッキングモードの時だけトラッキング速度設定を表示
-            if (state.currentMode === 'tracking') {
-                trackingSpeedSetting.style.display = 'block';
-            } else {
-                trackingSpeedSetting.style.display = 'none';
-            }
         }
 
         function closeSettings() {
@@ -2065,8 +2095,6 @@
             durationValue.textContent = preset.duration + 's';
             invertXCheckbox.checked = preset.invertX;
             invertYCheckbox.checked = preset.invertY;
-            trackingSpeedSlider.value = state.trackingSpeed * 100;
-            trackingSpeedValue.textContent = Math.round(state.trackingSpeed * 100) + '%';
 
             // 現在のプリセットを保存
             localStorage.setItem('currentPreset', presetId);
@@ -2505,6 +2533,9 @@
             
             if (!state.isPlaying || !state.isPointerLocked) return;
             
+            // トラッキングモードではクリックを無効化
+            if (state.currentMode === 'tracking') return;
+            
             // 画面中央からレイキャスト
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(targets3D);
@@ -2515,14 +2546,8 @@
                 const target = intersects[0].object;
                 if (!target.userData.hit) {
                     hitAny = true;
-                    // トラッキングモードではクリックでターゲットを消さない
-                    if (state.currentMode !== 'tracking') {
-                        state.reactionTimes.push(Date.now() - state.lastTargetTime);
-                        hitTarget3D(target);
-                    } else {
-                        // トラッキングモードではクリック音のみ
-                        playHitSound();
-                    }
+                    state.reactionTimes.push(Date.now() - state.lastTargetTime);
+                    hitTarget3D(target);
                 }
             }
             
@@ -2537,7 +2562,6 @@
                     const remaining = targets3D.filter(t => !t.userData.hit).length;
                     if (remaining === 0) setTimeout(spawnGridTargets, 200);
                 }
-                // トラッキングモードではターゲットを消さないので何もしない
             }
         });
 
@@ -2546,6 +2570,13 @@
         function startGame(mode) {
             state.currentMode = mode;
             resetState();
+            
+            // トラッキングモードの時は速度設定モーダルを表示
+            if (mode === 'tracking') {
+                openTrackingSpeedModal();
+                return;
+            }
+            
             menuScreen.classList.add('hidden');
             hud.classList.add('active');
             escHint.classList.add('active');
