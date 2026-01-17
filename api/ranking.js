@@ -193,31 +193,57 @@ export default async function handler(req, res) {
             // Get top 50 scores (sorted set, highest first)
             const result = await upstashCommand(['ZREVRANGE', key, '0', '49', 'WITHSCORES']);
             
-            console.log('Upstash result:', JSON.stringify(result, null, 2));
+            console.log('Upstash result (raw):', JSON.stringify(result, null, 2));
+            console.log('Upstash result type:', typeof result);
+            console.log('Upstash result keys:', result ? Object.keys(result) : 'null');
             
             // Upstashのレスポンス形式を確認
             // Upstash REST APIは { result: [...] } の形式で返す
             let scores = [];
             if (result) {
-                // result.result が配列の場合
+                // result.result が配列の場合（Upstash REST APIの標準形式）
                 if (result.result !== undefined) {
+                    console.log('Found result.result:', typeof result.result, Array.isArray(result.result));
                     if (Array.isArray(result.result)) {
                         scores = result.result;
+                        console.log('Using result.result as scores array, length:', scores.length);
                     } else {
                         // result.result が文字列やその他の場合
                         console.log('result.result is not an array:', typeof result.result, result.result);
+                        // 文字列の場合は配列に変換を試みる
+                        if (typeof result.result === 'string') {
+                            try {
+                                scores = JSON.parse(result.result);
+                                console.log('Parsed result.result string to array, length:', scores.length);
+                            } catch (e) {
+                                console.error('Failed to parse result.result as JSON:', e);
+                            }
+                        }
                     }
                 }
                 // result 自体が配列の場合（直接配列が返される場合）
                 else if (Array.isArray(result)) {
                     scores = result;
+                    console.log('Using result directly as scores array, length:', scores.length);
+                }
+                // result がオブジェクトで、他のプロパティに配列がある場合
+                else if (typeof result === 'object') {
+                    console.log('Result is object, checking all properties...');
+                    for (const [key, value] of Object.entries(result)) {
+                        console.log(`  ${key}:`, typeof value, Array.isArray(value) ? `array[${value.length}]` : value);
+                        if (Array.isArray(value) && value.length > 0) {
+                            scores = value;
+                            console.log(`Using ${key} as scores array, length:`, scores.length);
+                            break;
+                        }
+                    }
                 }
             }
             
-            console.log('Parsed scores:', {
+            console.log('Final parsed scores:', {
                 count: scores.length,
                 type: Array.isArray(scores) ? 'array' : typeof scores,
-                firstFew: scores.slice(0, 3)
+                firstFew: scores.slice(0, 5)
             });
             
             if (!scores || scores.length === 0) {
@@ -230,9 +256,23 @@ export default async function handler(req, res) {
 
             // Parse results: [name1, score1, name2, score2, ...]
             const rankings = [];
+            console.log('Parsing scores array, length:', scores.length);
+            
             for (let i = 0; i < scores.length; i += 2) {
+                if (i + 1 >= scores.length) {
+                    console.warn('Odd number of elements in scores array, skipping last element');
+                    break;
+                }
+                
                 const dataStr = scores[i];
-                const efficiency = parseInt(scores[i + 1]);
+                const efficiencyStr = scores[i + 1];
+                const efficiency = parseInt(efficiencyStr);
+                
+                console.log(`Processing entry ${i/2 + 1}:`, {
+                    dataStr: dataStr,
+                    efficiencyStr: efficiencyStr,
+                    efficiency: efficiency
+                });
                 
                 try {
                     const data = JSON.parse(dataStr);
@@ -243,14 +283,22 @@ export default async function handler(req, res) {
                         efficiency: efficiency,
                         date: data.date
                     });
+                    console.log(`  Parsed successfully:`, data.name, efficiency);
                 } catch (e) {
+                    console.warn(`  Failed to parse dataStr as JSON:`, e.message);
                     // Legacy data format
                     rankings.push({
                         name: dataStr,
                         efficiency: efficiency
                     });
+                    console.log(`  Using legacy format:`, dataStr, efficiency);
                 }
             }
+            
+            console.log('Final rankings array:', {
+                count: rankings.length,
+                firstFew: rankings.slice(0, 3)
+            });
 
             return res.status(200).json({ rankings });
         }
@@ -303,8 +351,12 @@ export default async function handler(req, res) {
 
             console.log('Adding score to sorted set:', scoreData);
             // Add to sorted set (score = efficiency for sorting)
-            const addResult = await upstashCommand(['ZADD', key, efficiency, JSON.stringify(scoreData)]);
+            const scoreDataStr = JSON.stringify(scoreData);
+            console.log('Score data string:', scoreDataStr);
+            const addResult = await upstashCommand(['ZADD', key, efficiency.toString(), scoreDataStr]);
             console.log('ZADD result:', addResult);
+            console.log('ZADD result type:', typeof addResult);
+            console.log('ZADD result keys:', addResult ? Object.keys(addResult) : 'null');
             
             console.log('Saving player best score');
             // Save player's best score
@@ -336,8 +388,26 @@ export default async function handler(req, res) {
             console.log('Score saved successfully, rank:', playerRank);
             
             // デバッグ用：保存後にすぐ取得して確認
+            console.log('Verifying saved score...');
             const verifyResult = await upstashCommand(['ZREVRANGE', key, '0', '4', 'WITHSCORES']);
-            console.log('Verification - top 5 scores after save:', verifyResult);
+            console.log('Verification - top 5 scores after save:', JSON.stringify(verifyResult, null, 2));
+            
+            // 保存したスコアが含まれているか確認
+            const verifyScores = verifyResult.result || verifyResult;
+            if (Array.isArray(verifyScores)) {
+                const found = verifyScores.some((item, index) => {
+                    if (index % 2 === 0) {
+                        try {
+                            const data = JSON.parse(item);
+                            return data.name === name && data.efficiency === efficiency;
+                        } catch (e) {
+                            return false;
+                        }
+                    }
+                    return false;
+                });
+                console.log('Saved score found in verification:', found);
+            }
             
             return res.status(200).json({ 
                 success: true, 

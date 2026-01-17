@@ -2465,6 +2465,21 @@
                         
                         const result = await response.json();
                         console.log('World ranking saved successfully:', result);
+                        
+                        // 保存成功時にキャッシュをクリアしてランキングを更新
+                        if (result.success) {
+                            // キャッシュをクリア
+                            const cacheKey = `${mode}_world`;
+                            delete rankingCache[cacheKey];
+                            
+                            // ランキングパネルが開いている場合は更新
+                            if (rankingPanel.classList.contains('open') && currentRankingMode === mode && currentRankingType === 'world') {
+                                console.log('Auto-refreshing ranking after save');
+                                setTimeout(() => {
+                                    displayRanking(mode, 'world');
+                                }, 500);
+                            }
+                        }
                     } catch (error) {
                         // リトライ可能なエラーの場合
                         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
