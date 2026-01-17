@@ -1384,6 +1384,9 @@
         <div class="ranking-header">
             <span class="ranking-title">🌍 WORLD RANKING</span>
             <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="ranking-refresh" id="rankingTest" title="接続テスト" style="font-size: 0.8rem; padding: 5px 8px;">
+                    テスト
+                </button>
                 <button class="ranking-refresh" id="rankingRefresh" title="更新">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.48L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
@@ -1963,6 +1966,31 @@
         rankingRefresh.addEventListener('click', () => {
             displayRanking(currentRankingMode, currentRankingType);
         });
+        
+        // 接続テストボタン
+        const rankingTest = document.getElementById('rankingTest');
+        rankingTest.addEventListener('click', async () => {
+            rankingTest.textContent = 'テスト中...';
+            rankingTest.disabled = true;
+            try {
+                const response = await fetch('/api/ranking?test=true');
+                const data = await response.json();
+                console.log('Connection test result:', data);
+                
+                if (data.test) {
+                    alert(`接続テスト成功！\n\n環境変数:\n- URL: ${data.env.url}\n- Token: ${data.env.token}\n\nテスト結果はコンソールを確認してください。`);
+                } else {
+                    alert(`接続テスト失敗: ${data.error || '不明なエラー'}`);
+                }
+            } catch (error) {
+                console.error('Connection test error:', error);
+                alert(`接続テスト失敗: ${error.message}\n\nVercelのデプロイメントと環境変数を確認してください。`);
+            } finally {
+                rankingTest.textContent = 'テスト';
+                rankingTest.disabled = false;
+            }
+        });
+        
         rankingOverlay.addEventListener('click', closeRanking);
 
         // オフラインランキングボタン
@@ -2379,24 +2407,36 @@
                 const saveToWorldRanking = async (retryCount = 0) => {
                     const maxRetries = 3;
                     try {
+                        const requestBody = {
+                            mode: mode,
+                            name: name,
+                            score: score,
+                            accuracy: accuracy,
+                            efficiency: efficiency
+                        };
+                        
+                        console.log('Sending POST request to /api/ranking:', requestBody);
+                        
                         const response = await fetch('/api/ranking', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({
-                                mode: mode,
-                                name: name,
-                                score: score,
-                                accuracy: accuracy,
-                                efficiency: efficiency
-                            })
+                            body: JSON.stringify(requestBody)
                         });
+                        
+                        console.log('POST response status:', response.status, response.statusText);
                         
                         console.log('World ranking API response status:', response.status);
                         
                         if (!response.ok) {
                             const errorText = await response.text();
+                            console.error('POST error response:', {
+                                status: response.status,
+                                statusText: response.statusText,
+                                body: errorText
+                            });
+                            
                             let errorData;
                             try {
                                 errorData = JSON.parse(errorText);
@@ -2405,17 +2445,22 @@
                             }
                             
                             // リトライ可能なエラーの場合
-                            if (retryCount < maxRetries && (response.status >= 500 || response.status === 0)) {
+                            if (retryCount < maxRetries && (response.status >= 500 || response.status === 0 || response.status === 404)) {
                                 console.log(`Retrying save... (${retryCount + 1}/${maxRetries})`);
                                 await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
                                 return saveToWorldRanking(retryCount + 1);
+                            }
+                            
+                            // 404エラーの場合、APIエンドポイントが存在しない可能性
+                            if (response.status === 404) {
+                                throw new Error(`APIエンドポイントが見つかりません (404)。Vercelのデプロイメントを確認してください。`);
                             }
                             
                             console.error('World ranking API error:', {
                                 status: response.status,
                                 error: errorData
                             });
-                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorData.message || errorText}`);
                         }
                         
                         const result = await response.json();
@@ -2516,17 +2561,28 @@
                     }
                 }
                 
-                // キャッシュバスターを追加（リトライ時）
-                const cacheBuster = retryCount > 0 ? `&_t=${Date.now()}` : '';
-                const response = await fetch(`/api/ranking?mode=${mode}${cacheBuster}`, {
+                // APIエンドポイントのURLを構築
+                const apiUrl = `/api/ranking?mode=${mode}${retryCount > 0 ? `&_t=${Date.now()}` : ''}`;
+                console.log('Fetching ranking from:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
-                        'Cache-Control': 'no-cache'
+                        'Cache-Control': 'no-cache',
+                        'Content-Type': 'application/json'
                     }
                 });
                 
+                console.log('API response status:', response.status, response.statusText);
+                
                 if (!response.ok) {
                     const errorText = await response.text();
+                    console.error('API error response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        body: errorText
+                    });
+                    
                     let errorData;
                     try {
                         errorData = JSON.parse(errorText);
@@ -2535,16 +2591,22 @@
                     }
                     
                     // リトライ可能なエラーの場合
-                    if (retryCount < maxRetries && (response.status >= 500 || response.status === 0)) {
+                    if (retryCount < maxRetries && (response.status >= 500 || response.status === 0 || response.status === 404)) {
                         console.log(`Retrying... (${retryCount + 1}/${maxRetries})`);
                         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
                         return displayRanking(mode, type, retryCount + 1);
                     }
                     
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
+                    // 404エラーの場合、APIエンドポイントが存在しない可能性
+                    if (response.status === 404) {
+                        throw new Error(`APIエンドポイントが見つかりません (404)。Vercelのデプロイメントを確認してください。`);
+                    }
+                    
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorData.message || errorText}`);
                 }
                 
                 const data = await response.json();
+                console.log('API response data:', data);
                 const modeRankings = data.rankings || [];
                 
                 // キャッシュに保存
