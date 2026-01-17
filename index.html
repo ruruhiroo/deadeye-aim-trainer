@@ -2453,8 +2453,14 @@
                 const target = intersects[0].object;
                 if (!target.userData.hit) {
                     hitAny = true;
-                    state.reactionTimes.push(Date.now() - state.lastTargetTime);
-                    hitTarget3D(target);
+                    // トラッキングモードではクリックでターゲットを消さない
+                    if (state.currentMode !== 'tracking') {
+                        state.reactionTimes.push(Date.now() - state.lastTargetTime);
+                        hitTarget3D(target);
+                    } else {
+                        // トラッキングモードではクリック音のみ
+                        playHitSound();
+                    }
                 }
             }
             
@@ -2469,6 +2475,7 @@
                     const remaining = targets3D.filter(t => !t.userData.hit).length;
                     if (remaining === 0) setTimeout(spawnGridTargets, 200);
                 }
+                // トラッキングモードではターゲットを消さないので何もしない
             }
         });
 
