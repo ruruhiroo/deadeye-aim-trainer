@@ -21,13 +21,19 @@ export default async function handler(req, res) {
         queryParams = req.query || {};
     }
     
-    console.log('API called:', {
+    // デバッグ用：全てのURL関連の情報をログに出力
+    console.log('API called - Full request info:', {
         method: req.method,
         url: req.url,
+        originalUrl: req.originalUrl,
         urlString: urlString,
         query: req.query,
         parsedQuery: queryParams,
-        isTestMode: isTestMode
+        isTestMode: isTestMode,
+        headers: {
+            host: req.headers.host,
+            referer: req.headers.referer
+        }
     });
     
     // CORS headers
