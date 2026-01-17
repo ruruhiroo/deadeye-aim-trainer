@@ -2493,9 +2493,9 @@
             state.yaw += e.movementX * state.sensitivity * 0.1 * xDir;
             state.pitch += e.movementY * state.sensitivity * 0.1 * yDir;
             
-            // 制限
-            state.pitch = Math.max(-45, Math.min(45, state.pitch));
-            state.yaw = Math.max(-60, Math.min(60, state.yaw));
+            // 制限を大きく拡張（視点が飛ばないように）
+            state.pitch = Math.max(-90, Math.min(90, state.pitch));
+            state.yaw = Math.max(-180, Math.min(180, state.yaw));
             
             updateWorld();
         });
@@ -2767,19 +2767,23 @@
         function spawnGridTargets() {
             if (!state.isPlaying) return;
             clearTargets3D();
-            const positions = [
-                { x: -3.5, y: -1, z: -6 },
-                { x: 3.5, y: -1, z: -6 },
-                { x: 0, y: 1, z: -7 },
-                { x: -2.5, y: 0.5, z: -5 },
-                { x: 2.5, y: 0.5, z: -5 }
-            ];
-            positions.forEach(pos => {
+            
+            // 完全にランダムな位置に5つのターゲットを配置
+            const numTargets = 5;
+            const minX = -5, maxX = 5;
+            const minY = -2, maxY = 2;
+            const minZ = -8, maxZ = -4;
+            
+            for (let i = 0; i < numTargets; i++) {
+                const x = minX + Math.random() * (maxX - minX);
+                const y = minY + Math.random() * (maxY - minY);
+                const z = minZ + Math.random() * (maxZ - minZ);
+                
                 const target = createTarget3D(false);
-                target.position.set(pos.x, pos.y, pos.z);
+                target.position.set(x, y, z);
                 scene.add(target);
                 targets3D.push(target);
-            });
+            }
             state.lastTargetTime = Date.now();
         }
 
