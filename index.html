@@ -1316,6 +1316,11 @@
                     <input type="range" id="presetDuration" min="10" max="120" value="30">
                     <span id="presetDurationValue">30s</span>
                 </div>
+                <div class="preset-setting-item" id="presetTrackingSpeedItem" style="display: none;">
+                    <label>トラッキング速度</label>
+                    <input type="range" id="presetTrackingSpeed" min="25" max="200" step="5" value="100">
+                    <span id="presetTrackingSpeedValue">100%</span>
+                </div>
                 <div class="preset-setting-item checkbox-row">
                     <label><input type="checkbox" id="presetInvertX"> 左右反転</label>
                     <label><input type="checkbox" id="presetInvertY"> 上下反転</label>
@@ -1384,6 +1389,12 @@
             <div class="setting-item">
                 <div class="setting-label">ゲーム時間<span class="setting-value" id="durationValue">30s</span></div>
                 <input type="range" class="setting-slider" id="durationSlider" min="15" max="60" step="5" value="30">
+            </div>
+            
+            <!-- トラッキング速度（トラッキングモードのみ） -->
+            <div class="setting-item" id="trackingSpeedSetting" style="display: none;">
+                <div class="setting-label">トラッキング速度<span class="setting-value" id="trackingSpeedValue">100%</span></div>
+                <input type="range" class="setting-slider" id="trackingSpeedSlider" min="25" max="200" step="5" value="100">
             </div>
             
             <!-- マウス反転 -->
@@ -1635,6 +1646,7 @@
             timeLeft: 30, isPlaying: false, gameTimer: null, targetTimer: null,
             reactionTimes: [], lastTargetTime: 0,
             sensitivity: 1.0, targetSizeMultiplier: 0.5, gameDuration: 30,
+            trackingSpeed: 1.0, // トラッキング速度（1.0 = 100%）
             invertX: false, invertY: false,
             // 視点角度
             pitch: 0, // 上下
@@ -1726,6 +1738,16 @@
         document.getElementById('durationSlider').addEventListener('input', (e) => {
             state.gameDuration = parseInt(e.target.value);
             document.getElementById('durationValue').textContent = e.target.value + 's';
+        });
+        
+        // トラッキング速度スライダー
+        const trackingSpeedSlider = document.getElementById('trackingSpeedSlider');
+        const trackingSpeedValue = document.getElementById('trackingSpeedValue');
+        const trackingSpeedSetting = document.getElementById('trackingSpeedSetting');
+        
+        trackingSpeedSlider.addEventListener('input', (e) => {
+            state.trackingSpeed = parseInt(e.target.value) / 100;
+            trackingSpeedValue.textContent = e.target.value + '%';
         });
         document.getElementById('invertXCheckbox').addEventListener('change', (e) => {
             state.invertX = e.target.checked;
@@ -1835,6 +1857,12 @@
         function openSettings() {
             settingsPanel.classList.add('open');
             settingsOverlay.classList.add('open');
+            // トラッキングモードの時だけトラッキング速度設定を表示
+            if (state.currentMode === 'tracking') {
+                trackingSpeedSetting.style.display = 'block';
+            } else {
+                trackingSpeedSetting.style.display = 'none';
+            }
         }
 
         function closeSettings() {
@@ -1932,6 +1960,8 @@
         const presetTargetSizeValue = document.getElementById('presetTargetSizeValue');
         const presetDurationSlider = document.getElementById('presetDuration');
         const presetDurationValue = document.getElementById('presetDurationValue');
+        const presetTrackingSpeedSlider = document.getElementById('presetTrackingSpeed');
+        const presetTrackingSpeedValue = document.getElementById('presetTrackingSpeedValue');
         const presetInvertXCheckbox = document.getElementById('presetInvertX');
         const presetInvertYCheckbox = document.getElementById('presetInvertY');
         
@@ -1944,6 +1974,9 @@
         });
         presetDurationSlider.addEventListener('input', () => {
             presetDurationValue.textContent = presetDurationSlider.value + 's';
+        });
+        presetTrackingSpeedSlider.addEventListener('input', () => {
+            presetTrackingSpeedValue.textContent = presetTrackingSpeedSlider.value + '%';
         });
 
         // デフォルトプリセット
@@ -2021,6 +2054,7 @@
             state.timeLeft = preset.duration;
             state.invertX = preset.invertX;
             state.invertY = preset.invertY;
+            state.trackingSpeed = preset.trackingSpeed || 1.0;
 
             // UIを更新
             sensitivitySlider.value = preset.sensitivity;
@@ -2031,6 +2065,8 @@
             durationValue.textContent = preset.duration + 's';
             invertXCheckbox.checked = preset.invertX;
             invertYCheckbox.checked = preset.invertY;
+            trackingSpeedSlider.value = state.trackingSpeed * 100;
+            trackingSpeedValue.textContent = Math.round(state.trackingSpeed * 100) + '%';
 
             // 現在のプリセットを保存
             localStorage.setItem('currentPreset', presetId);
@@ -2070,6 +2106,16 @@
             presetInvertXCheckbox.checked = state.invertX;
             presetInvertYCheckbox.checked = state.invertY;
             
+            // トラッキングモードの時だけトラッキング速度設定を表示
+            const presetTrackingSpeedItem = document.getElementById('presetTrackingSpeedItem');
+            if (state.currentMode === 'tracking') {
+                presetTrackingSpeedItem.style.display = 'flex';
+                presetTrackingSpeedSlider.value = state.trackingSpeed * 100;
+                presetTrackingSpeedValue.textContent = Math.round(state.trackingSpeed * 100) + '%';
+            } else {
+                presetTrackingSpeedItem.style.display = 'none';
+            }
+            
             presetModal.classList.add('active');
             presetNameInput.focus();
         }
@@ -2091,6 +2137,16 @@
             presetDurationValue.textContent = preset.duration + 's';
             presetInvertXCheckbox.checked = preset.invertX || false;
             presetInvertYCheckbox.checked = preset.invertY || false;
+            
+            // トラッキングモードの時だけトラッキング速度設定を表示
+            const presetTrackingSpeedItem = document.getElementById('presetTrackingSpeedItem');
+            if (state.currentMode === 'tracking') {
+                presetTrackingSpeedItem.style.display = 'flex';
+                presetTrackingSpeedSlider.value = (preset.trackingSpeed || 1.0) * 100;
+                presetTrackingSpeedValue.textContent = Math.round((preset.trackingSpeed || 1.0) * 100) + '%';
+            } else {
+                presetTrackingSpeedItem.style.display = 'none';
+            }
             
             presetModal.classList.add('active');
             presetNameInput.focus();
@@ -2116,6 +2172,10 @@
             const newDuration = parseInt(presetDurationSlider.value);
             const newInvertX = presetInvertXCheckbox.checked;
             const newInvertY = presetInvertYCheckbox.checked;
+            // トラッキングモードの時だけトラッキング速度を取得
+            const newTrackingSpeed = state.currentMode === 'tracking' 
+                ? (parseInt(presetTrackingSpeedSlider.value) / 100) 
+                : 1.0;
 
             const presets = loadPresets();
             
@@ -2130,7 +2190,8 @@
                         targetSize: newTargetSize,
                         duration: newDuration,
                         invertX: newInvertX,
-                        invertY: newInvertY
+                        invertY: newInvertY,
+                        trackingSpeed: newTrackingSpeed
                     };
                     savePresets(presets);
                     selectPreset(editingPresetId);
@@ -2144,7 +2205,8 @@
                     targetSize: newTargetSize,
                     duration: newDuration,
                     invertX: newInvertX,
-                    invertY: newInvertY
+                    invertY: newInvertY,
+                    trackingSpeed: newTrackingSpeed
                 };
                 presets.push(newPreset);
                 savePresets(presets);
@@ -2604,13 +2666,24 @@
             targets3D.push(target);
             
             let x = 0, y = 0, z = -6;
-            let vx = (Math.random() - 0.5) * 0.06, vy = (Math.random() - 0.5) * 0.04;
+            // トラッキング速度を適用
+            const baseSpeedX = 0.06;
+            const baseSpeedY = 0.04;
+            const speedMultiplier = state.trackingSpeed;
+            let vx = (Math.random() - 0.5) * baseSpeedX * speedMultiplier, 
+                vy = (Math.random() - 0.5) * baseSpeedY * speedMultiplier;
             let trackingPoints = 0, totalFrames = 0;
             
             function move() {
                 if (!state.isPlaying) return;
-                if (Math.random() < 0.02) { vx += (Math.random() - 0.5) * 0.03; vy += (Math.random() - 0.5) * 0.02; }
-                vx = Math.max(-0.05, Math.min(0.05, vx)); vy = Math.max(-0.04, Math.min(0.04, vy));
+                if (Math.random() < 0.02) { 
+                    vx += (Math.random() - 0.5) * 0.03 * speedMultiplier; 
+                    vy += (Math.random() - 0.5) * 0.02 * speedMultiplier; 
+                }
+                const maxSpeedX = 0.05 * speedMultiplier;
+                const maxSpeedY = 0.04 * speedMultiplier;
+                vx = Math.max(-maxSpeedX, Math.min(maxSpeedX, vx)); 
+                vy = Math.max(-maxSpeedY, Math.min(maxSpeedY, vy));
                 x += vx; y += vy;
                 if (Math.abs(x) > 4) vx *= -1;
                 if (Math.abs(y) > 2) vy *= -1;
