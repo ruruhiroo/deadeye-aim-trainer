@@ -2768,43 +2768,18 @@
             if (!state.isPlaying) return;
             clearTargets3D();
             
-            // 完全にランダムな位置に5つのターゲットを配置（広い範囲）
+            // 完全にランダムな位置に5つのターゲットを配置（非常に広い範囲）
             const numTargets = 5;
-            const minX = -8, maxX = 8;
-            const minY = -4, maxY = 4;
-            const minZ = -10, maxZ = -3;
-            
-            // ターゲット同士が重ならないように最小距離を確保
-            const minDistance = 1.5;
-            const positions = [];
+            // 視野角を考慮した広い範囲
+            const minX = -10, maxX = 10;
+            const minY = -6, maxY = 6;
+            const minZ = -12, maxZ = -2;
             
             for (let i = 0; i < numTargets; i++) {
-                let attempts = 0;
-                let x, y, z;
-                let validPosition = false;
-                
-                // 有効な位置を見つけるまで試行
-                while (!validPosition && attempts < 50) {
-                    x = minX + Math.random() * (maxX - minX);
-                    y = minY + Math.random() * (maxY - minY);
-                    z = minZ + Math.random() * (maxZ - minZ);
-                    
-                    // 既存の位置との距離をチェック
-                    validPosition = true;
-                    for (const pos of positions) {
-                        const dx = x - pos.x;
-                        const dy = y - pos.y;
-                        const dz = z - pos.z;
-                        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                        if (distance < minDistance) {
-                            validPosition = false;
-                            break;
-                        }
-                    }
-                    attempts++;
-                }
-                
-                positions.push({ x, y, z });
+                // 完全にランダムな位置を生成
+                const x = minX + Math.random() * (maxX - minX);
+                const y = minY + Math.random() * (maxY - minY);
+                const z = minZ + Math.random() * (maxZ - minZ);
                 
                 const target = createTarget3D(false);
                 target.position.set(x, y, z);
