@@ -528,16 +528,38 @@
             color: #FFD700;
         }
 
-        .ranking-close {
+        .ranking-close, .ranking-refresh {
             background: none;
             border: none;
             color: var(--text-secondary);
             font-size: 1.2rem;
             cursor: pointer;
+            padding: 5px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
         }
 
-        .ranking-close:hover {
+        .ranking-close:hover, .ranking-refresh:hover {
             color: var(--primary);
+        }
+        
+        .ranking-refresh {
+            font-size: 1rem;
+        }
+        
+        .ranking-refresh:active {
+            transform: rotate(180deg);
+        }
+        
+        .ranking-refresh.loading {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .ranking-notice {
@@ -1361,7 +1383,14 @@
     <div class="ranking-panel" id="rankingPanel">
         <div class="ranking-header">
             <span class="ranking-title">🌍 WORLD RANKING</span>
-            <button class="ranking-close" id="rankingClose">✕</button>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="ranking-refresh" id="rankingRefresh" title="更新">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.48L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                </button>
+                <button class="ranking-close" id="rankingClose">✕</button>
+            </div>
         </div>
         <div class="ranking-notice" id="rankingNotice">
             ⚠️ ランキングは「的のサイズ50%・ゲーム時間30秒」のみ反映されます
@@ -1909,9 +1938,14 @@
         const rankingPanel = document.getElementById('rankingPanel');
         const rankingOverlay = document.getElementById('rankingOverlay');
         const rankingClose = document.getElementById('rankingClose');
+        const rankingRefresh = document.getElementById('rankingRefresh');
         const rankingList = document.getElementById('rankingList');
         let currentRankingMode = 'flick';
         let currentRankingType = 'world'; // 'world' or 'personal'
+        
+        // ランキングキャッシュ（5秒間有効）
+        const rankingCache = {};
+        const CACHE_DURATION = 5000; // 5秒
 
         function openRanking() {
             rankingPanel.classList.add('open');
@@ -1926,6 +1960,9 @@
 
         rankingBtn.addEventListener('click', openRanking);
         rankingClose.addEventListener('click', closeRanking);
+        rankingRefresh.addEventListener('click', () => {
+            displayRanking(currentRankingMode, currentRankingType);
+        });
         rankingOverlay.addEventListener('click', closeRanking);
 
         // オフラインランキングボタン
@@ -2338,47 +2375,67 @@
                     efficiency: efficiency
                 });
                 
-                // 世界ランキングAPIに送信
-                try {
-                    const response = await fetch('/api/ranking', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            mode: mode,
-                            name: name,
-                            score: score,
-                            accuracy: accuracy,
-                            efficiency: efficiency
-                        })
-                    });
-                    
-                    console.log('World ranking API response status:', response.status);
-                    
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        let errorData;
-                        try {
-                            errorData = JSON.parse(errorText);
-                        } catch (e) {
-                            errorData = { error: errorText };
-                        }
-                        console.error('World ranking API error:', {
-                            status: response.status,
-                            error: errorData
+                // 世界ランキングAPIに送信（リトライ機能付き）
+                const saveToWorldRanking = async (retryCount = 0) => {
+                    const maxRetries = 3;
+                    try {
+                        const response = await fetch('/api/ranking', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                mode: mode,
+                                name: name,
+                                score: score,
+                                accuracy: accuracy,
+                                efficiency: efficiency
+                            })
                         });
-                        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
+                        
+                        console.log('World ranking API response status:', response.status);
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            let errorData;
+                            try {
+                                errorData = JSON.parse(errorText);
+                            } catch (e) {
+                                errorData = { error: errorText };
+                            }
+                            
+                            // リトライ可能なエラーの場合
+                            if (retryCount < maxRetries && (response.status >= 500 || response.status === 0)) {
+                                console.log(`Retrying save... (${retryCount + 1}/${maxRetries})`);
+                                await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
+                                return saveToWorldRanking(retryCount + 1);
+                            }
+                            
+                            console.error('World ranking API error:', {
+                                status: response.status,
+                                error: errorData
+                            });
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
+                        }
+                        
+                        const result = await response.json();
+                        console.log('World ranking saved successfully:', result);
+                    } catch (error) {
+                        // リトライ可能なエラーの場合
+                        if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+                            console.log(`Retrying save... (${retryCount + 1}/${maxRetries})`);
+                            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
+                            return saveToWorldRanking(retryCount + 1);
+                        }
+                        
+                        console.error('Failed to save to world ranking:', error);
+                        console.error('Error details:', error.message, error.stack);
+                        // エラーをユーザーに通知（オプション）
+                        // alert('世界ランキングへの保存に失敗しました: ' + error.message);
                     }
-                    
-                    const result = await response.json();
-                    console.log('World ranking saved successfully:', result);
-                } catch (error) {
-                    console.error('Failed to save to world ranking:', error);
-                    console.error('Error details:', error.message, error.stack);
-                    // エラーをユーザーに通知（オプション）
-                    // alert('世界ランキングへの保存に失敗しました: ' + error.message);
-                }
+                };
+                
+                saveToWorldRanking();
             } else {
                 console.log('World ranking conditions not met:', {
                     targetSize: targetSize,
@@ -2388,12 +2445,15 @@
             }
         }
 
-        // ランキング表示
-        async function displayRanking(mode, type = 'world') {
+        // ランキング表示（リトライ機能付き）
+        async function displayRanking(mode, type = 'world', retryCount = 0) {
+            const maxRetries = 3;
+            rankingRefresh.classList.toggle('loading', retryCount === 0);
             rankingList.innerHTML = '<div class="ranking-empty">読み込み中...</div>';
             
             // オフラインランキングの場合（ローカルストレージの全スコア）
             if (type === 'offline') {
+                rankingRefresh.classList.remove('loading');
                 const personalRankings = JSON.parse(localStorage.getItem('deadeyePersonalRankings') || '{}');
                 const modeRankings = personalRankings[mode] || [];
                 
@@ -2425,9 +2485,45 @@
                 return;
             }
             
-            // 世界ランキングの場合
+            // 世界ランキングの場合（リトライ機能付き）
             try {
-                const response = await fetch(`/api/ranking?mode=${mode}`);
+                // キャッシュチェック（リトライ時はキャッシュを使わない）
+                const cacheKey = `${mode}_${type}`;
+                if (retryCount === 0 && rankingCache[cacheKey]) {
+                    const cached = rankingCache[cacheKey];
+                    if (Date.now() - cached.timestamp < CACHE_DURATION) {
+                        console.log('Using cached ranking data');
+                        rankingRefresh.classList.remove('loading');
+                        const modeRankings = cached.data.rankings || [];
+                        
+                        if (modeRankings.length === 0) {
+                            rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
+                            return;
+                        }
+                        
+                        rankingList.innerHTML = modeRankings.map((r, i) => `
+                            <div class="ranking-item">
+                                <div class="ranking-position">#${i + 1}</div>
+                                <div class="ranking-info">
+                                    <div class="ranking-name">${r.name || 'Player'}</div>
+                                    <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
+                                    <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
+                                </div>
+                                <div class="ranking-date">${r.date}</div>
+                            </div>
+                        `).join('');
+                        return;
+                    }
+                }
+                
+                // キャッシュバスターを追加（リトライ時）
+                const cacheBuster = retryCount > 0 ? `&_t=${Date.now()}` : '';
+                const response = await fetch(`/api/ranking?mode=${mode}${cacheBuster}`, {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -2437,11 +2533,27 @@
                     } catch (e) {
                         errorData = { error: errorText };
                     }
+                    
+                    // リトライ可能なエラーの場合
+                    if (retryCount < maxRetries && (response.status >= 500 || response.status === 0)) {
+                        console.log(`Retrying... (${retryCount + 1}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
+                        return displayRanking(mode, type, retryCount + 1);
+                    }
+                    
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || errorText}`);
                 }
                 
                 const data = await response.json();
                 const modeRankings = data.rankings || [];
+                
+                // キャッシュに保存
+                rankingCache[cacheKey] = {
+                    data: data,
+                    timestamp: Date.now()
+                };
+                
+                rankingRefresh.classList.remove('loading');
                 
                 if (modeRankings.length === 0) {
                     rankingList.innerHTML = '<div class="ranking-empty">まだ記録がありません</div>';
@@ -2460,14 +2572,26 @@
                     </div>
                 `).join('');
             } catch (error) {
+                rankingRefresh.classList.remove('loading');
                 console.error('Failed to fetch world ranking:', error);
                 console.error('Error details:', error.message, error.stack);
+                
+                // リトライ可能なエラーの場合
+                if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+                    console.log(`Retrying... (${retryCount + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
+                    return displayRanking(mode, type, retryCount + 1);
+                }
                 
                 // エラーの詳細を表示
                 let errorMessage = '読み込みに失敗しました';
                 if (error.message) {
                     errorMessage += `<br><small style="color: #ff6b6b;">${error.message}</small>`;
                 }
+                if (retryCount > 0) {
+                    errorMessage += `<br><small style="color: #ff6b6b;">リトライ回数: ${retryCount}/${maxRetries}</small>`;
+                }
+                errorMessage += `<br><button onclick="displayRanking('${mode}', '${type}')" style="margin-top: 10px; padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">再試行</button>`;
                 rankingList.innerHTML = `<div class="ranking-empty">${errorMessage}</div>`;
             }
         }
