@@ -1382,7 +1382,7 @@
     <!-- ランキングパネル -->
     <div class="ranking-panel" id="rankingPanel">
         <div class="ranking-header">
-            <span class="ranking-title">🌍 WORLD RANKING</span>
+            <span class="ranking-title" id="rankingTitle">🌍 WORLD RANKING</span>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="ranking-refresh" id="rankingTest" title="接続テスト" style="font-size: 0.8rem; padding: 5px 8px;">
                     テスト
@@ -1943,6 +1943,7 @@
         const rankingClose = document.getElementById('rankingClose');
         const rankingRefresh = document.getElementById('rankingRefresh');
         const rankingList = document.getElementById('rankingList');
+        const rankingTitle = document.getElementById('rankingTitle');
         let currentRankingMode = 'flick';
         let currentRankingType = 'world'; // 'world' or 'personal'
         
@@ -1953,6 +1954,9 @@
         function openRanking() {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
+            
+            // タイトルを更新
+            rankingTitle.textContent = '🌍 WORLD RANKING';
             
             // ワールドランキングタブのみ表示
             document.querySelectorAll('.ranking-tab').forEach(tab => {
@@ -2018,6 +2022,9 @@
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
             
+            // タイトルを更新
+            rankingTitle.textContent = '🏆 オフラインランキング';
+            
             // オフラインランキングタブのみ表示
             document.querySelectorAll('.ranking-tab').forEach(tab => {
                 if (tab.dataset.type === 'offline') {
@@ -2048,6 +2055,9 @@
                 
                 if (tabType === 'offline') {
                     // オフラインランキングタブ：指定されたモードでオフラインランキングを表示
+                    // タイトルを更新
+                    rankingTitle.textContent = '🏆 オフラインランキング';
+                    
                     // オフラインタブのみ表示
                     document.querySelectorAll('.ranking-tab').forEach(t => {
                         if (t.dataset.type === 'offline') {
@@ -2065,6 +2075,9 @@
                     displayRanking(currentRankingMode, currentRankingType);
                 } else {
                     // 世界ランキングタブ：モードを変更
+                    // タイトルを更新
+                    rankingTitle.textContent = '🌍 WORLD RANKING';
+                    
                     // ワールドタブのみ表示
                     document.querySelectorAll('.ranking-tab').forEach(t => {
                         if (t.dataset.type === 'world') {
