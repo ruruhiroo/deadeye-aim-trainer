@@ -87,6 +87,11 @@
             0%, 100% { opacity: 0.5; transform: translateX(-10%); }
             50% { opacity: 1; transform: translateX(10%); }
         }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         .menu-screen.hidden { display: none; }
 
@@ -2698,13 +2703,45 @@
                     return;
                 }
                 
-                rankingList.innerHTML = modeRankings.map((r, i) => `
-                    <div class="ranking-item">
+                // 統計情報を計算
+                const totalPlayers = modeRankings.length;
+                const topScore = modeRankings[0]?.efficiency || 0;
+                const avgEfficiency = modeRankings.reduce((sum, r) => sum + (r.efficiency || 0), 0) / totalPlayers;
+                const lastUpdate = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                
+                // ランキング表示（統計情報ヘッダー付き）
+                rankingList.innerHTML = `
+                    <div style="padding: 12px 15px; background: linear-gradient(135deg, rgba(0, 255, 194, 0.1), rgba(255, 70, 85, 0.1)); border-bottom: 2px solid rgba(0, 255, 194, 0.3); margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="color: var(--accent-cyan); font-size: 0.85rem; font-weight: bold; font-family: 'Orbitron', sans-serif;">
+                                📊 統計情報
+                            </div>
+                            <div style="color: var(--text-secondary); font-size: 0.7rem;">
+                                更新: ${lastUpdate}
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-secondary); font-size: 0.65rem; margin-bottom: 2px;">総プレイヤー数</div>
+                                <div style="color: var(--accent-cyan); font-size: 1rem; font-weight: bold; font-family: 'Orbitron', sans-serif;">${totalPlayers}人</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-secondary); font-size: 0.65rem; margin-bottom: 2px;">最高スコア</div>
+                                <div style="color: #FFD700; font-size: 1rem; font-weight: bold; font-family: 'Orbitron', sans-serif;">${topScore.toLocaleString()}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-secondary); font-size: 0.65rem; margin-bottom: 2px;">平均スコア</div>
+                                <div style="color: var(--primary); font-size: 1rem; font-weight: bold; font-family: 'Orbitron', sans-serif;">${Math.round(avgEfficiency).toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                ` + modeRankings.map((r, i) => `
+                    <div class="ranking-item" style="animation: fadeIn 0.3s ease ${i * 0.05}s both;">
                         <div class="ranking-position">#${i + 1}</div>
                         <div class="ranking-info">
                             <div class="ranking-name">${r.name || 'Player'}</div>
                             <div class="ranking-score">${r.efficiency.toLocaleString()}</div>
-                            <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}</div>
+                            <div class="ranking-details">Score: ${r.score} × Acc: ${r.accuracy}%</div>
                         </div>
                         <div class="ranking-date">${r.date}</div>
                     </div>
