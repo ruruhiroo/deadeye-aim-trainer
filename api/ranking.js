@@ -325,11 +325,35 @@ export default async function handler(req, res) {
         // POST: スコア保存
         if (req.method === 'POST') {
             console.log('POST request received:', req.body);
-            const { mode, name, score, accuracy, efficiency } = req.body;
+            let { mode, name, score, accuracy, efficiency } = req.body;
+            
+            // accuracyが文字列（"%を含む）の場合は数値に変換
+            if (typeof accuracy === 'string') {
+                accuracy = parseFloat(accuracy.replace('%', ''));
+                console.log('Converted accuracy from string to number:', accuracy);
+            }
+            
+            // 型チェックと値の確認
+            console.log('Validating fields:', {
+                mode: typeof mode, name: typeof name, 
+                score: typeof score, scoreValue: score,
+                accuracy: typeof accuracy, accuracyValue: accuracy,
+                efficiency: typeof efficiency, efficiencyValue: efficiency
+            });
 
-            if (!mode || !name || score === undefined || !accuracy || efficiency === undefined) {
+            if (!mode || !name || score === undefined || accuracy === undefined || accuracy === null || efficiency === undefined) {
                 console.error('Missing required fields:', { mode, name, score, accuracy, efficiency });
-                return res.status(400).json({ error: 'Missing required fields' });
+                return res.status(400).json({ error: 'Missing required fields', details: { mode, name, score, accuracy, efficiency } });
+            }
+            
+            // 数値の検証
+            score = parseInt(score);
+            accuracy = parseFloat(accuracy);
+            efficiency = parseInt(efficiency);
+            
+            if (isNaN(score) || isNaN(accuracy) || isNaN(efficiency)) {
+                console.error('Invalid numeric values:', { score, accuracy, efficiency });
+                return res.status(400).json({ error: 'Invalid numeric values', details: { score, accuracy, efficiency } });
             }
 
             const key = `ranking:${mode}`;
