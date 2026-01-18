@@ -195,7 +195,13 @@ export default async function handler(req, res) {
             
             console.log('Upstash result (raw):', JSON.stringify(result, null, 2));
             console.log('Upstash result type:', typeof result);
-            console.log('Upstash result keys:', result ? Object.keys(result) : 'null');
+            if (result && typeof result === 'object') {
+                console.log('Upstash result keys:', Object.keys(result));
+                // 全てのプロパティを確認
+                for (const [key, value] of Object.entries(result)) {
+                    console.log(`  ${key}:`, typeof value, Array.isArray(value) ? `array[${value?.length || 0}]` : value);
+                }
+            }
             
             // Upstashのレスポンス形式を確認
             // Upstash REST APIは { result: [...] } の形式で返す
@@ -213,8 +219,13 @@ export default async function handler(req, res) {
                         // 文字列の場合は配列に変換を試みる
                         if (typeof result.result === 'string') {
                             try {
-                                scores = JSON.parse(result.result);
-                                console.log('Parsed result.result string to array, length:', scores.length);
+                                const parsed = JSON.parse(result.result);
+                                if (Array.isArray(parsed)) {
+                                    scores = parsed;
+                                    console.log('Parsed result.result string to array, length:', scores.length);
+                                } else {
+                                    console.log('Parsed result is not an array:', typeof parsed, parsed);
+                                }
                             } catch (e) {
                                 console.error('Failed to parse result.result as JSON:', e);
                             }
@@ -228,16 +239,24 @@ export default async function handler(req, res) {
                 }
                 // result がオブジェクトで、他のプロパティに配列がある場合
                 else if (typeof result === 'object') {
-                    console.log('Result is object, checking all properties...');
+                    console.log('Result is object, checking all properties for arrays...');
                     for (const [key, value] of Object.entries(result)) {
-                        console.log(`  ${key}:`, typeof value, Array.isArray(value) ? `array[${value.length}]` : value);
-                        if (Array.isArray(value) && value.length > 0) {
-                            scores = value;
-                            console.log(`Using ${key} as scores array, length:`, scores.length);
-                            break;
+                        if (Array.isArray(value)) {
+                            console.log(`Found array in property "${key}":`, value.length, 'items');
+                            if (value.length > 0) {
+                                scores = value;
+                                console.log(`Using ${key} as scores array, length:`, scores.length);
+                                break;
+                            }
                         }
                     }
+                    // 配列が見つからない場合、すべての値を確認
+                    if (scores.length === 0) {
+                        console.log('No array found in result object. All values:', Object.values(result));
+                    }
                 }
+            } else {
+                console.error('Result is null or undefined!');
             }
             
             console.log('Final parsed scores:', {
