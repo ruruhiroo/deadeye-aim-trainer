@@ -1953,6 +1953,25 @@
         function openRanking() {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
+            
+            // ワールドランキングタブのみ表示
+            document.querySelectorAll('.ranking-tab').forEach(tab => {
+                if (tab.dataset.type === 'world') {
+                    tab.style.display = 'flex';
+                } else if (tab.dataset.type === 'offline') {
+                    tab.style.display = 'none';
+                }
+            });
+            
+            // ワールドランキングの最初のタブをアクティブに
+            document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
+            const firstWorldTab = document.querySelector('.ranking-tab[data-type="world"]');
+            if (firstWorldTab) {
+                firstWorldTab.classList.add('active');
+                currentRankingMode = firstWorldTab.dataset.mode;
+            }
+            currentRankingType = 'world';
+            
             displayRanking(currentRankingMode, currentRankingType);
         }
 
@@ -1998,14 +2017,25 @@
         offlineRankingBtn.addEventListener('click', () => {
             rankingPanel.classList.add('open');
             rankingOverlay.classList.add('open');
-            // 世界ランキングタブを非アクティブにして、現在のモードのオフラインタブをアクティブに
-            document.querySelectorAll('.ranking-tab').forEach(t => {
-                t.classList.remove('active');
-                if (t.dataset.type === 'offline' && (t.dataset.offlineMode || t.dataset.mode) === currentRankingMode) {
-                    t.classList.add('active');
+            
+            // オフラインランキングタブのみ表示
+            document.querySelectorAll('.ranking-tab').forEach(tab => {
+                if (tab.dataset.type === 'offline') {
+                    tab.style.display = 'flex';
+                } else if (tab.dataset.type === 'world') {
+                    tab.style.display = 'none';
                 }
             });
+            
+            // オフラインランキングの最初のタブをアクティブに
+            document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
+            const firstOfflineTab = document.querySelector('.ranking-tab[data-type="offline"]');
+            if (firstOfflineTab) {
+                firstOfflineTab.classList.add('active');
+                currentRankingMode = firstOfflineTab.dataset.offlineMode || firstOfflineTab.dataset.mode;
+            }
             currentRankingType = 'offline';
+            
             displayRanking(currentRankingMode, currentRankingType);
         });
 
@@ -2018,6 +2048,15 @@
                 
                 if (tabType === 'offline') {
                     // オフラインランキングタブ：指定されたモードでオフラインランキングを表示
+                    // オフラインタブのみ表示
+                    document.querySelectorAll('.ranking-tab').forEach(t => {
+                        if (t.dataset.type === 'offline') {
+                            t.style.display = 'flex';
+                        } else if (t.dataset.type === 'world') {
+                            t.style.display = 'none';
+                        }
+                    });
+                    
                     document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
                     const offlineMode = tab.dataset.offlineMode || tab.dataset.mode;
@@ -2026,6 +2065,15 @@
                     displayRanking(currentRankingMode, currentRankingType);
                 } else {
                     // 世界ランキングタブ：モードを変更
+                    // ワールドタブのみ表示
+                    document.querySelectorAll('.ranking-tab').forEach(t => {
+                        if (t.dataset.type === 'world') {
+                            t.style.display = 'flex';
+                        } else if (t.dataset.type === 'offline') {
+                            t.style.display = 'none';
+                        }
+                    });
+                    
                     document.querySelectorAll('.ranking-tab').forEach(t => {
                         if (t.dataset.type === 'world') {
                             t.classList.remove('active');
