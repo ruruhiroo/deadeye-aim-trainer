@@ -353,10 +353,19 @@ export default async function handler(req, res) {
             // Add to sorted set (score = efficiency for sorting)
             const scoreDataStr = JSON.stringify(scoreData);
             console.log('Score data string:', scoreDataStr);
+            console.log('ZADD command:', ['ZADD', key, efficiency.toString(), scoreDataStr]);
             const addResult = await upstashCommand(['ZADD', key, efficiency.toString(), scoreDataStr]);
             console.log('ZADD result:', addResult);
             console.log('ZADD result type:', typeof addResult);
             console.log('ZADD result keys:', addResult ? Object.keys(addResult) : 'null');
+            
+            // ZADDの成功を確認
+            const addSuccess = (addResult.result !== undefined ? addResult.result : addResult);
+            if (addSuccess === null || addSuccess === undefined) {
+                console.error('ZADD may have failed - result is null/undefined');
+            } else {
+                console.log('ZADD successful, result value:', addSuccess);
+            }
             
             console.log('Saving player best score');
             // Save player's best score
@@ -389,24 +398,61 @@ export default async function handler(req, res) {
             
             // デバッグ用：保存後にすぐ取得して確認
             console.log('Verifying saved score...');
-            const verifyResult = await upstashCommand(['ZREVRANGE', key, '0', '4', 'WITHSCORES']);
-            console.log('Verification - top 5 scores after save:', JSON.stringify(verifyResult, null, 2));
+            
+            // まず、ZCARDで件数を確認
+            const cardResult = await upstashCommand(['ZCARD', key]);
+            const cardCount = cardResult.result !== undefined ? cardResult.result : cardResult;
+            console.log('Total scores in sorted set (ZCARD):', cardCount);
+            
+            // 次に、ZREVRANGEで全件取得（最大10件）
+            const verifyResult = await upstashCommand(['ZREVRANGE', key, '0', '9', 'WITHSCORES']);
+            console.log('Verification - top 10 scores after save:', JSON.stringify(verifyResult, null, 2));
             
             // 保存したスコアが含まれているか確認
-            const verifyScores = verifyResult.result || verifyResult;
-            if (Array.isArray(verifyScores)) {
+            let verifyScores = [];
+            if (verifyResult.result !== undefined) {
+                if (Array.isArray(verifyResult.result)) {
+                    verifyScores = verifyResult.result;
+                }
+            } else if (Array.isArray(verifyResult)) {
+                verifyScores = verifyResult;
+            }
+            
+            console.log('Verification scores array length:', verifyScores.length);
+            console.log('Verification scores array:', verifyScores);
+            
+            if (Array.isArray(verifyScores) && verifyScores.length > 0) {
                 const found = verifyScores.some((item, index) => {
                     if (index % 2 === 0) {
                         try {
                             const data = JSON.parse(item);
-                            return data.name === name && data.efficiency === efficiency;
+                            const matches = data.name === name && parseInt(data.efficiency) === parseInt(efficiency);
+                            if (matches) {
+                                console.log('Found matching score at index', index, ':', data);
+                            }
+                            return matches;
                         } catch (e) {
+                            console.log('Failed to parse verification item:', item, e.message);
                             return false;
                         }
                     }
                     return false;
                 });
                 console.log('Saved score found in verification:', found);
+                
+                if (!found) {
+                    console.warn('WARNING: Saved score not found in verification results!');
+                    console.warn('Expected name:', name, 'efficiency:', efficiency);
+                    console.warn('Verification items:', verifyScores.filter((_, i) => i % 2 === 0).map(item => {
+                        try {
+                            return JSON.parse(item);
+                        } catch (e) {
+                            return item;
+                        }
+                    }));
+                }
+            } else {
+                console.warn('WARNING: Verification result is not a valid array!');
             }
             
             return res.status(200).json({ 
