@@ -2821,16 +2821,30 @@
             updateWorld();
         });
 
+        // カメラ更新フラグ（マウス移動時に設定、animate内で更新）
+        let cameraNeedsUpdate = false;
+        
         function updateWorld() {
-            // Three.jsカメラの回転（ラジアンに変換）
-            camera.rotation.x = -state.pitch * Math.PI / 180;
-            camera.rotation.y = -state.yaw * Math.PI / 180;
+            // カメラ更新フラグを設定（実際の更新はanimate内で行う）
+            cameraNeedsUpdate = true;
         }
         
-        // Three.js アニメーションループ
+        // Three.js アニメーションループ（最適化版）
+        let animationId = null;
         function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+            animationId = requestAnimationFrame(animate);
+            
+            // カメラ更新が必要な場合のみ更新
+            if (cameraNeedsUpdate && state.isPlaying) {
+                camera.rotation.x = -state.pitch * Math.PI / 180;
+                camera.rotation.y = -state.yaw * Math.PI / 180;
+                cameraNeedsUpdate = false;
+            }
+            
+            // ゲーム中のみレンダリング
+            if (state.isPlaying || targets3D.length > 0) {
+                renderer.render(scene, camera);
+            }
         }
         animate();
         
@@ -3043,8 +3057,7 @@
                 y = Math.max(-2, Math.min(2, y));
                 target.position.set(x, y, z);
                 
-                // レイキャストでヒット判定
-                const raycaster = new THREE.Raycaster();
+                // レイキャストでヒット判定（Raycasterを再利用）
                 raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
                 const intersects = raycaster.intersectObject(target);
                 
