@@ -2555,8 +2555,28 @@
                         
                         const result = await response.json();
                         console.log('World ranking saved successfully:', result);
+                        console.log('Save result details:', {
+                            success: result.success,
+                            rank: result.rank,
+                            updated: result.updated
+                        });
                         
                         // 保存成功時にキャッシュをクリアしてランキングを更新
+                        // キャッシュを完全にクリア
+                        Object.keys(rankingCache).forEach(key => {
+                            if (key.startsWith(mode + '_')) {
+                                delete rankingCache[key];
+                            }
+                        });
+                        console.log('Cache cleared for mode:', mode);
+                        
+                        // 少し待ってからランキングを更新（Upstashの反映を待つ）
+                        setTimeout(() => {
+                            if (currentRankingType === 'world' && currentRankingMode === mode) {
+                                console.log('Refreshing ranking display after save...');
+                                displayRanking(mode, 'world');
+                            }
+                        }, 1000);
                         if (result.success) {
                             // キャッシュをクリア
                             const cacheKey = `${mode}_world`;

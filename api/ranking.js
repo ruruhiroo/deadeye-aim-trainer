@@ -207,29 +207,27 @@ export default async function handler(req, res) {
             // Upstash REST APIは { result: [...] } の形式で返す
             let scores = [];
             if (result) {
-                // result.result が配列の場合（Upstash REST APIの標準形式）
+                // まず、result.result を確認（Upstash REST APIの標準形式）
                 if (result.result !== undefined) {
                     console.log('Found result.result:', typeof result.result, Array.isArray(result.result));
                     if (Array.isArray(result.result)) {
                         scores = result.result;
                         console.log('Using result.result as scores array, length:', scores.length);
-                    } else {
-                        // result.result が文字列やその他の場合
-                        console.log('result.result is not an array:', typeof result.result, result.result);
+                    } else if (typeof result.result === 'string') {
                         // 文字列の場合は配列に変換を試みる
-                        if (typeof result.result === 'string') {
-                            try {
-                                const parsed = JSON.parse(result.result);
-                                if (Array.isArray(parsed)) {
-                                    scores = parsed;
-                                    console.log('Parsed result.result string to array, length:', scores.length);
-                                } else {
-                                    console.log('Parsed result is not an array:', typeof parsed, parsed);
-                                }
-                            } catch (e) {
-                                console.error('Failed to parse result.result as JSON:', e);
+                        try {
+                            const parsed = JSON.parse(result.result);
+                            if (Array.isArray(parsed)) {
+                                scores = parsed;
+                                console.log('Parsed result.result string to array, length:', scores.length);
+                            } else {
+                                console.log('Parsed result is not an array:', typeof parsed, parsed);
                             }
+                        } catch (e) {
+                            console.error('Failed to parse result.result as JSON:', e);
                         }
+                    } else {
+                        console.log('result.result is not an array or string:', typeof result.result, result.result);
                     }
                 }
                 // result 自体が配列の場合（直接配列が返される場合）
@@ -243,20 +241,47 @@ export default async function handler(req, res) {
                     for (const [key, value] of Object.entries(result)) {
                         if (Array.isArray(value)) {
                             console.log(`Found array in property "${key}":`, value.length, 'items');
-                            if (value.length > 0) {
-                                scores = value;
-                                console.log(`Using ${key} as scores array, length:`, scores.length);
-                                break;
-                            }
+                            scores = value;
+                            console.log(`Using ${key} as scores array, length:`, scores.length);
+                            break;
                         }
                     }
                     // 配列が見つからない場合、すべての値を確認
                     if (scores.length === 0) {
                         console.log('No array found in result object. All values:', Object.values(result));
+                        console.log('Full result object:', JSON.stringify(result, null, 2));
                     }
                 }
             } else {
                 console.error('Result is null or undefined!');
+            }
+            
+            // デバッグ：scoresが空の場合、キーの存在と内容を確認
+            if (scores.length === 0) {
+                console.log('Scores array is empty. Checking key existence and content...');
+                const existsResult = await upstashCommand(['EXISTS', key]);
+                console.log('Key exists result:', existsResult);
+                const existsValue = existsResult.result !== undefined ? existsResult.result : existsResult;
+                console.log('Key exists value:', existsValue);
+                
+                if (existsValue === 1 || existsValue === true) {
+                    // キーは存在するが、データが空の場合
+                    console.log('Key exists but no data found. Trying ZCARD...');
+                    const cardResult = await upstashCommand(['ZCARD', key]);
+                    const cardValue = cardResult.result !== undefined ? cardResult.result : cardResult;
+                    console.log('ZCARD result:', cardValue);
+                    
+                    // 別の方法で取得を試みる
+                    console.log('Trying ZRANGE (ascending) as alternative...');
+                    const altResult = await upstashCommand(['ZRANGE', key, '0', '-1', 'WITHSCORES']);
+                    console.log('ZRANGE result:', JSON.stringify(altResult, null, 2));
+                    
+                    // もしZRANGEでデータが見つかった場合
+                    if (altResult && altResult.result && Array.isArray(altResult.result) && altResult.result.length > 0) {
+                        scores = altResult.result;
+                        console.log('Found data using ZRANGE, length:', scores.length);
+                    }
+                }
             }
             
             console.log('Final parsed scores:', {
@@ -397,17 +422,43 @@ export default async function handler(req, res) {
             const scoreDataStr = JSON.stringify(scoreData);
             console.log('Score data string:', scoreDataStr);
             console.log('ZADD command:', ['ZADD', key, efficiency.toString(), scoreDataStr]);
-            const addResult = await upstashCommand(['ZADD', key, efficiency.toString(), scoreDataStr]);
-            console.log('ZADD result:', addResult);
-            console.log('ZADD result type:', typeof addResult);
-            console.log('ZADD result keys:', addResult ? Object.keys(addResult) : 'null');
             
-            // ZADDの成功を確認
-            const addSuccess = (addResult.result !== undefined ? addResult.result : addResult);
-            if (addSuccess === null || addSuccess === undefined) {
-                console.error('ZADD may have failed - result is null/undefined');
-            } else {
-                console.log('ZADD successful, result value:', addSuccess);
+            try {
+                const addResult = await upstashCommand(['ZADD', key, efficiency.toString(), scoreDataStr]);
+                console.log('ZADD result (raw):', JSON.stringify(addResult, null, 2));
+                console.log('ZADD result type:', typeof addResult);
+                if (addResult && typeof addResult === 'object') {
+                    console.log('ZADD result keys:', Object.keys(addResult));
+                }
+                
+                // ZADDの成功を確認
+                // ZADDは追加された要素の数を返す（既存の要素を更新した場合は0を返す可能性がある）
+                let addSuccess;
+                if (addResult.result !== undefined) {
+                    addSuccess = addResult.result;
+                } else if (typeof addResult === 'number') {
+                    addSuccess = addResult;
+                } else if (Array.isArray(addResult) && addResult.length > 0) {
+                    addSuccess = addResult[0];
+                } else {
+                    addSuccess = addResult;
+                }
+                
+                console.log('ZADD success value:', addSuccess, 'type:', typeof addSuccess);
+                
+                // ZADDが成功したか確認（0以上であれば成功）
+                if (addSuccess === null || addSuccess === undefined) {
+                    console.error('❌ ZADD may have failed - result is null/undefined');
+                    throw new Error('ZADD command returned null/undefined');
+                } else if (typeof addSuccess === 'number' && addSuccess < 0) {
+                    console.error('❌ ZADD may have failed - result is negative:', addSuccess);
+                    throw new Error(`ZADD command returned negative value: ${addSuccess}`);
+                } else {
+                    console.log('✅ ZADD successful, result value:', addSuccess);
+                }
+            } catch (addError) {
+                console.error('❌ ZADD command failed:', addError);
+                throw new Error(`Failed to add score to sorted set: ${addError.message}`);
             }
             
             console.log('Saving player best score');
@@ -445,24 +496,45 @@ export default async function handler(req, res) {
             // まず、ZCARDで件数を確認
             const cardResult = await upstashCommand(['ZCARD', key]);
             const cardCount = cardResult.result !== undefined ? cardResult.result : cardResult;
-            console.log('Total scores in sorted set (ZCARD):', cardCount);
+            console.log('Total scores in sorted set (ZCARD):', cardCount, 'type:', typeof cardCount);
             
             // 次に、ZREVRANGEで全件取得（最大10件）
             const verifyResult = await upstashCommand(['ZREVRANGE', key, '0', '9', 'WITHSCORES']);
-            console.log('Verification - top 10 scores after save:', JSON.stringify(verifyResult, null, 2));
+            console.log('Verification - top 10 scores after save (raw):', JSON.stringify(verifyResult, null, 2));
             
             // 保存したスコアが含まれているか確認
             let verifyScores = [];
-            if (verifyResult.result !== undefined) {
-                if (Array.isArray(verifyResult.result)) {
-                    verifyScores = verifyResult.result;
+            
+            // Upstash REST APIのレスポンス形式を処理
+            if (verifyResult) {
+                if (verifyResult.result !== undefined) {
+                    if (Array.isArray(verifyResult.result)) {
+                        verifyScores = verifyResult.result;
+                    } else if (typeof verifyResult.result === 'string') {
+                        try {
+                            const parsed = JSON.parse(verifyResult.result);
+                            if (Array.isArray(parsed)) {
+                                verifyScores = parsed;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse verifyResult.result:', e);
+                        }
+                    }
+                } else if (Array.isArray(verifyResult)) {
+                    verifyScores = verifyResult;
+                } else if (typeof verifyResult === 'object') {
+                    // オブジェクト内の配列を探す
+                    for (const [k, v] of Object.entries(verifyResult)) {
+                        if (Array.isArray(v)) {
+                            verifyScores = v;
+                            break;
+                        }
+                    }
                 }
-            } else if (Array.isArray(verifyResult)) {
-                verifyScores = verifyResult;
             }
             
             console.log('Verification scores array length:', verifyScores.length);
-            console.log('Verification scores array:', verifyScores);
+            console.log('Verification scores array (first 10 items):', verifyScores.slice(0, 10));
             
             if (Array.isArray(verifyScores) && verifyScores.length > 0) {
                 const found = verifyScores.some((item, index) => {
@@ -471,7 +543,7 @@ export default async function handler(req, res) {
                             const data = JSON.parse(item);
                             const matches = data.name === name && parseInt(data.efficiency) === parseInt(efficiency);
                             if (matches) {
-                                console.log('Found matching score at index', index, ':', data);
+                                console.log('✅ Found matching score at index', index, ':', data);
                             }
                             return matches;
                         } catch (e) {
@@ -484,18 +556,30 @@ export default async function handler(req, res) {
                 console.log('Saved score found in verification:', found);
                 
                 if (!found) {
-                    console.warn('WARNING: Saved score not found in verification results!');
+                    console.warn('⚠️ WARNING: Saved score not found in verification results!');
                     console.warn('Expected name:', name, 'efficiency:', efficiency);
-                    console.warn('Verification items:', verifyScores.filter((_, i) => i % 2 === 0).map(item => {
-                        try {
-                            return JSON.parse(item);
-                        } catch (e) {
-                            return item;
+                    console.warn('Saved scoreData:', scoreData);
+                    console.warn('Verification items (first 5):', verifyScores.slice(0, 10).map((item, i) => {
+                        if (i % 2 === 0) {
+                            try {
+                                return JSON.parse(item);
+                            } catch (e) {
+                                return item;
+                            }
                         }
-                    }));
+                        return null;
+                    }).filter(x => x !== null));
+                    
+                    // 別の方法で検証：ZSCOREで直接確認
+                    console.log('Trying ZSCORE to verify...');
+                    const zscoreResult = await upstashCommand(['ZSCORE', key, scoreDataStr]);
+                    console.log('ZSCORE result:', zscoreResult);
+                } else {
+                    console.log('✅ Verification successful: Score is in the sorted set');
                 }
             } else {
-                console.warn('WARNING: Verification result is not a valid array!');
+                console.warn('⚠️ WARNING: Verification result is not a valid array!');
+                console.warn('verifyResult:', JSON.stringify(verifyResult, null, 2));
             }
             
             return res.status(200).json({ 
