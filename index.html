@@ -2839,6 +2839,11 @@
                 camera.rotation.x = -state.pitch * Math.PI / 180;
                 camera.rotation.y = -state.yaw * Math.PI / 180;
                 cameraNeedsUpdate = false;
+                
+                // デバッグ：レイキャストの線を更新
+                if (debugLine && state.isPlaying) {
+                    updateDebugLine();
+                }
             }
             
             // ゲーム中のみレンダリング
@@ -2858,6 +2863,40 @@
         // クリック = 射撃（Three.js Raycaster使用）
         const raycaster = new THREE.Raycaster();
         
+        // デバッグ用：レイキャストの可視化
+        let debugLine = null;
+        let debugHelper = null;
+        
+        function createDebugLine() {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0, 0, -10)
+            ]);
+            const material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 3 });
+            return new THREE.Line(geometry, material);
+        }
+        
+        function updateDebugLine() {
+            if (!debugLine) {
+                debugLine = createDebugLine();
+                scene.add(debugLine);
+            }
+            
+            // カメラの位置と方向を取得
+            const origin = new THREE.Vector3();
+            camera.getWorldPosition(origin);
+            
+            const direction = new THREE.Vector3(0, 0, -1);
+            direction.applyQuaternion(camera.quaternion);
+            direction.normalize();
+            
+            // レイの終点を計算（10単位先）
+            const endPoint = origin.clone().add(direction.multiplyScalar(10));
+            
+            // ラインを更新
+            debugLine.geometry.setFromPoints([origin, endPoint]);
+        }
+        
         document.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             
@@ -2875,6 +2914,9 @@
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(targets3D);
             
+            // デバッグ：レイキャストの線を更新
+            updateDebugLine();
+            
             let hitAny = false;
             
             if (intersects.length > 0) {
@@ -2883,7 +2925,41 @@
                     hitAny = true;
                     state.reactionTimes.push(Date.now() - state.lastTargetTime);
                     hitTarget3D(target);
+                    
+                    // デバッグ：ヒットしたターゲットを強調表示
+                    if (debugHelper) {
+                        scene.remove(debugHelper);
+                    }
+                    const helper = new THREE.BoxHelper(target, 0x00ff00);
+                    helper.material.linewidth = 3;
+                    scene.add(helper);
+                    debugHelper = helper;
+                    setTimeout(() => {
+                        if (debugHelper) {
+                            scene.remove(debugHelper);
+                            debugHelper = null;
+                        }
+                    }, 500);
                 }
+            } else {
+                // デバッグ：ミスした時は赤いボックスを表示
+                if (debugHelper) {
+                    scene.remove(debugHelper);
+                }
+                const missHelper = new THREE.BoxHelper(new THREE.Mesh(
+                    new THREE.SphereGeometry(0.1, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                ), 0xff0000);
+                missHelper.position.copy(camera.position);
+                missHelper.position.add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(-5));
+                scene.add(missHelper);
+                debugHelper = missHelper;
+                setTimeout(() => {
+                    if (debugHelper) {
+                        scene.remove(debugHelper);
+                        debugHelper = null;
+                    }
+                }, 200);
             }
             
             state.totalClicks++;
@@ -3001,7 +3077,23 @@
             const glow = new THREE.Mesh(glowGeometry, glowMaterial);
             sphere.add(glow);
             
-            sphere.userData = { hit: false, isTracking };
+            // デバッグ用：当たり判定範囲を可視化（ワイヤーフレーム）
+            const wireframe = new THREE.WireframeGeometry(geometry);
+            const wireframeMaterial = new THREE.LineBasicMaterial({
+                color: 0xffff00,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.5
+            });
+            const wireframeMesh = new THREE.LineSegments(wireframe, wireframeMaterial);
+            sphere.add(wireframeMesh);
+            
+            // デバッグ用：当たり判定範囲を示すボックスヘルパー
+            const boxHelper = new THREE.BoxHelper(sphere, 0x00ff00);
+            boxHelper.material.linewidth = 2;
+            sphere.add(boxHelper);
+            
+            sphere.userData = { hit: false, isTracking, boxHelper, wireframeMesh };
             return sphere;
         }
 
@@ -3021,6 +3113,16 @@
         function clearTargets3D() {
             targets3D.forEach(t => scene.remove(t));
             targets3D.length = 0;
+            
+            // デバッグ用のオブジェクトもクリア
+            if (debugLine) {
+                scene.remove(debugLine);
+                debugLine = null;
+            }
+            if (debugHelper) {
+                scene.remove(debugHelper);
+                debugHelper = null;
+            }
         }
 
         function startTracking() {
