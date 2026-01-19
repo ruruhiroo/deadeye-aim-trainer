@@ -390,22 +390,45 @@ export default async function handler(req, res) {
             const existingScore = await upstashCommand(['GET', playerKey]);
             console.log('Existing score check:', existingScore);
             
-            const existingValue = existingScore.result || existingScore;
-            if (existingValue) {
-                console.log('Existing score found:', existingValue);
-                const existing = JSON.parse(existingValue);
-                // Only update if new score is higher
-                if (efficiency <= existing.efficiency) {
-                    console.log('New score is not higher, skipping update');
-                    return res.status(200).json({ 
-                        success: true, 
-                        message: 'Score not updated (existing score is higher)',
-                        updated: false
-                    });
+            const existingValue = existingScore.result !== undefined ? existingScore.result : existingScore;
+            if (existingValue && existingValue !== null) {
+                console.log('Existing score found:', existingValue, 'type:', typeof existingValue);
+                
+                // existingValueが文字列の場合はJSON.parse、既にオブジェクトの場合はそのまま使用
+                let existing;
+                if (typeof existingValue === 'string') {
+                    try {
+                        existing = JSON.parse(existingValue);
+                    } catch (e) {
+                        console.error('Failed to parse existing score:', e);
+                        // パースに失敗した場合は新規として扱う
+                        existing = null;
+                    }
+                } else if (typeof existingValue === 'object') {
+                    existing = existingValue;
+                } else {
+                    console.warn('Unexpected existingValue type:', typeof existingValue);
+                    existing = null;
                 }
-                console.log('Removing old score from sorted set');
-                // Remove old score from sorted set
-                await upstashCommand(['ZREM', key, JSON.stringify(existing)]);
+                
+                if (existing && existing.efficiency !== undefined) {
+                    // Only update if new score is higher
+                    if (efficiency <= existing.efficiency) {
+                        console.log('New score is not higher, skipping update');
+                        return res.status(200).json({ 
+                            success: true, 
+                            message: 'Score not updated (existing score is higher)',
+                            updated: false
+                        });
+                    }
+                    console.log('Removing old score from sorted set');
+                    // Remove old score from sorted set
+                    await upstashCommand(['ZREM', key, JSON.stringify(existing)]);
+                } else {
+                    console.log('Existing score data is invalid or missing efficiency, proceeding with new score');
+                }
+            } else {
+                console.log('No existing score found, proceeding with new score');
             }
 
             // Create score data
