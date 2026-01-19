@@ -1922,14 +1922,34 @@
         document.getElementById('retryBtn').addEventListener('click', retryGame);
         document.getElementById('menuBtn').addEventListener('click', backToMenu);
         document.getElementById('worldRankingBtn').addEventListener('click', async () => {
-            if (!state.pendingScore) return;
+            console.log('World ranking button clicked');
+            console.log('state.pendingScore:', state.pendingScore);
+            
+            if (!state.pendingScore) {
+                console.error('No pending score found');
+                alert('スコアデータが見つかりません。ゲームを再開してください。');
+                return;
+            }
             
             const playerNameInput = document.getElementById('playerNameInput');
             const playerName = playerNameInput.value.trim() || localStorage.getItem('deadeyePlayerName') || 'Player';
             
+            console.log('Player name:', playerName);
+            console.log('Current game settings:', {
+                targetSize: Math.round(state.targetSizeMultiplier * 100),
+                gameDuration: state.gameDuration
+            });
+            
             const acc = state.pendingScore.accuracy;
             const accNum = typeof acc === 'string' ? parseFloat(acc.replace('%', '')) / 100 : parseFloat(acc) / 100;
             const efficiency = Math.round(state.pendingScore.score * accNum);
+            
+            console.log('Calculated values:', {
+                acc: acc,
+                accNum: accNum,
+                efficiency: efficiency,
+                score: state.pendingScore.score
+            });
             
             await saveToWorldRanking(
                 state.pendingScore.mode,
@@ -3335,7 +3355,9 @@
                 mode: state.currentMode,
                 score: state.score,
                 accuracy: acc,
-                efficiency: efficiency
+                efficiency: efficiency,
+                targetSize: Math.round(state.targetSizeMultiplier * 100),
+                gameDuration: state.gameDuration
             };
             
             // 前回の名前を復元
