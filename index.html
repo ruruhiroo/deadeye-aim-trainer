@@ -2522,11 +2522,28 @@
         
         // 世界ランキングに保存する関数（ボタン押下時に呼び出し）
         async function saveToWorldRanking(mode, score, accuracy, efficiency, playerName, retryCount = 0) {
-            const targetSize = Math.round(state.targetSizeMultiplier * 100);
+            console.log('saveToWorldRanking called with:', {
+                mode, score, accuracy, efficiency, playerName, retryCount
+            });
+            
+            // pendingScoreから保存された値を取得（ゲーム終了後の設定変更を防ぐため）
+            const targetSize = state.pendingScore ? state.pendingScore.targetSize : Math.round(state.targetSizeMultiplier * 100);
+            const gameDuration = state.pendingScore ? state.pendingScore.gameDuration : state.gameDuration;
+            
+            console.log('Game settings from pendingScore:', {
+                targetSize: targetSize,
+                gameDuration: gameDuration,
+                required: '50% and 30s',
+                pendingScore: state.pendingScore
+            });
             
             // 世界ランキング条件：サイズ50%、秒数30秒のみ
-            if (targetSize !== 50 || state.gameDuration !== 30) {
-                alert('世界ランキングに反映するには、的のサイズ50%・ゲーム時間30秒でプレイする必要があります。');
+            if (targetSize !== 50 || gameDuration !== 30) {
+                console.warn('World ranking conditions not met:', {
+                    targetSize: targetSize,
+                    gameDuration: gameDuration
+                });
+                alert(`世界ランキングに反映するには、的のサイズ50%・ゲーム時間30秒でプレイする必要があります。\n現在の設定: サイズ${targetSize}%・時間${gameDuration}秒`);
                 return;
             }
             
