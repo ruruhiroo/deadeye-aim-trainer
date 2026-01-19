@@ -614,7 +614,7 @@ export default async function handler(req, res) {
 
         // DELETE: スコア削除（管理者用）
         if (req.method === 'DELETE') {
-            const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+            const adminPassword = process.env.ADMIN_PASSWORD || 'hiro0419';
             const authHeader = req.headers.authorization;
             
             if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
@@ -646,7 +646,7 @@ export default async function handler(req, res) {
 
         // PUT: スコア編集（管理者用）
         if (req.method === 'PUT') {
-            const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+            const adminPassword = process.env.ADMIN_PASSWORD || 'hiro0419';
             const authHeader = req.headers.authorization;
             
             if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
