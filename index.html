@@ -1646,6 +1646,7 @@
                 <span id="cooldownTimer">3</span>秒後に操作可能
             </div>
             <div class="result-buttons">
+                <button class="result-btn world-ranking-btn" id="worldRankingBtn" disabled style="background: var(--accent-cyan); color: var(--bg-darker);">世界ランキングに反映</button>
                 <button class="result-btn primary" id="retryBtn" disabled>RETRY</button>
                 <button class="result-btn secondary" id="menuBtn" disabled>MENU</button>
             </div>
@@ -1920,6 +1921,24 @@
         backBtn.addEventListener('click', backToMenu);
         document.getElementById('retryBtn').addEventListener('click', retryGame);
         document.getElementById('menuBtn').addEventListener('click', backToMenu);
+        document.getElementById('worldRankingBtn').addEventListener('click', async () => {
+            if (!state.pendingScore) return;
+            
+            const playerNameInput = document.getElementById('playerNameInput');
+            const playerName = playerNameInput.value.trim() || localStorage.getItem('deadeyePlayerName') || 'Player';
+            
+            const acc = state.pendingScore.accuracy;
+            const accNum = typeof acc === 'string' ? parseFloat(acc.replace('%', '')) / 100 : parseFloat(acc) / 100;
+            const efficiency = Math.round(state.pendingScore.score * accNum);
+            
+            await saveToWorldRanking(
+                state.pendingScore.mode,
+                state.pendingScore.score,
+                acc,
+                efficiency,
+                playerName
+            );
+        });
 
         // 設定パネル開閉
         const settingsBtn = document.getElementById('settingsBtn');
@@ -2567,24 +2586,23 @@
                             const cacheKey = `${mode}_world`;
                             delete rankingCache[cacheKey];
                             console.log('Cache cleared for mode:', mode, '(ranking will be updated on menu/retry button click)');
+                            alert('世界ランキングに反映しました！');
                         }
                     } catch (error) {
                         // リトライ可能なエラーの場合
                         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
                             console.log(`Retrying save... (${retryCount + 1}/${maxRetries})`);
                             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数バックオフ
-                            return saveToWorldRanking(retryCount + 1);
+                            return saveToWorldRankingAPI(retryCount + 1);
                         }
                         
                         console.error('Failed to save to world ranking:', error);
                         console.error('Error details:', error.message, error.stack);
-                        // エラーをユーザーに通知（オプション）
-                        // alert('世界ランキングへの保存に失敗しました: ' + error.message);
+                        alert('世界ランキングへの保存に失敗しました: ' + error.message);
                     }
                 };
                 
-                saveToWorldRanking();
-            } else {
+                await saveToWorldRankingAPI(); else {
                 console.log('World ranking conditions not met:', {
                     targetSize: targetSize,
                     gameDuration: state.gameDuration,
@@ -3306,14 +3324,15 @@
             state.pendingScore = {
                 mode: state.currentMode,
                 score: state.score,
-                accuracy: acc
+                accuracy: acc,
+                efficiency: efficiency
             };
             
             // 前回の名前を復元
             const playerNameInput = document.getElementById('playerNameInput');
             playerNameInput.value = savedName || '';
             
-            // オートセーブ：ゲーム終了時に自動でスコアを保存
+            // オートセーブ：ゲーム終了時に自動でスコアを保存（オフラインランキングのみ）
             saveScore(state.currentMode, state.score, acc, savedName);
             
             // プレイヤー名変更時に再保存
@@ -3327,11 +3346,13 @@
             // ボタンを無効化してクールダウン表示
             const retryBtn = document.getElementById('retryBtn');
             const menuBtn = document.getElementById('menuBtn');
+            const worldRankingBtn = document.getElementById('worldRankingBtn');
             const cooldownDiv = document.getElementById('resultCooldown');
             const cooldownTimer = document.getElementById('cooldownTimer');
             
             retryBtn.disabled = true;
             menuBtn.disabled = true;
+            worldRankingBtn.disabled = true;
             cooldownDiv.classList.remove('hidden');
             
             let countdown = 3;
