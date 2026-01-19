@@ -260,13 +260,10 @@
         </div>
 
         <div class="admin-panel" id="adminPanel">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div class="mode-tabs">
-                    <button class="mode-tab active" onclick="switchMode('flick')">FLICK</button>
-                    <button class="mode-tab" onclick="switchMode('tracking')">TRACK</button>
-                    <button class="mode-tab" onclick="switchMode('grid')">GRID</button>
-                </div>
-                <button class="btn-delete" onclick="resetAll()" style="padding: 10px 20px; font-size: 1rem;">ALLリセット</button>
+            <div class="mode-tabs">
+                <button class="mode-tab active" onclick="switchMode('flick')">FLICK</button>
+                <button class="mode-tab" onclick="switchMode('tracking')">TRACK</button>
+                <button class="mode-tab" onclick="switchMode('grid')">GRID</button>
             </div>
 
             <div id="message"></div>
@@ -444,39 +441,6 @@
                     loadRankings();
                 } else {
                     showMessage('エラー: ' + (data.error || '削除に失敗しました'), 'error');
-                }
-            } catch (error) {
-                showMessage('エラー: ' + error.message, 'error');
-            }
-        }
-
-        async function resetAll() {
-            if (!confirm('⚠️ 警告: 全てのランキングデータを削除します。この操作は取り消せません。\n\n本当に実行しますか？')) {
-                return;
-            }
-
-            if (!confirm('最後の確認: 本当に全てのランキングを削除しますか？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/ranking', {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${adminPassword}`
-                    },
-                    body: JSON.stringify({
-                        resetAll: true
-                    })
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage('全てのランキングをリセットしました', 'success');
-                    loadRankings();
-                } else {
-                    showMessage('エラー: ' + (data.error || 'リセットに失敗しました'), 'error');
                 }
             } catch (error) {
                 showMessage('エラー: ' + error.message, 'error');

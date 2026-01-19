@@ -2814,9 +2814,9 @@
             state.yaw += e.movementX * state.sensitivity * 0.1 * xDir;
             state.pitch += e.movementY * state.sensitivity * 0.1 * yDir;
             
-            // 制限を大きく拡張（視点が飛ばないように）
-            state.pitch = Math.max(-90, Math.min(90, state.pitch));
-            state.yaw = Math.max(-180, Math.min(180, state.yaw));
+            // 制限を大幅に拡張（視点移動の範囲を広げる）
+            state.pitch = Math.max(-120, Math.min(120, state.pitch));
+            state.yaw = Math.max(-360, Math.min(360, state.yaw));
             
             updateWorld();
         });
