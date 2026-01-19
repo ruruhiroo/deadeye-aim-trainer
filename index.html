@@ -3168,6 +3168,7 @@
             if (document.exitPointerLock) document.exitPointerLock();
             clearTargets3D();
             trackingIndicator.classList.remove('active');
+            cameraNeedsUpdate = false; // カメラ更新を停止
             
             const avgTime = state.reactionTimes.length > 0 ?
                 Math.round(state.reactionTimes.reduce((a, b) => a + b, 0) / state.reactionTimes.length) : 0;
