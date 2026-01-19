@@ -621,8 +621,34 @@ export default async function handler(req, res) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
-            const { mode, name, efficiency } = req.body;
+            const { mode, name, efficiency, resetAll } = req.body;
 
+            // ALLリセットの場合
+            if (resetAll === true) {
+                const modes = ['flick', 'tracking', 'grid'];
+                const deletedKeys = [];
+
+                for (const m of modes) {
+                    const key = `ranking:${m}`;
+                    // キーが存在するか確認
+                    const exists = await upstashCommand(['EXISTS', key]);
+                    const existsValue = exists.result !== undefined ? exists.result : exists;
+                    
+                    if (existsValue === 1 || existsValue === true) {
+                        // キーを削除
+                        await upstashCommand(['DEL', key]);
+                        deletedKeys.push(key);
+                    }
+                }
+
+                return res.status(200).json({ 
+                    success: true, 
+                    message: 'All rankings reset',
+                    deletedKeys: deletedKeys
+                });
+            }
+
+            // 個別削除の場合
             if (!mode || !name || efficiency === undefined) {
                 return res.status(400).json({ error: 'Missing required fields' });
             }

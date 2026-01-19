@@ -2993,7 +2993,18 @@
             }
         });
 
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') backToMenu(); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                backToMenu();
+            } else if (e.key === 'r' || e.key === 'R') {
+                // 視点リセット（Rキー）
+                if (state.isPlaying && state.isPointerLocked) {
+                    state.pitch = 0;
+                    state.yaw = 0;
+                    updateWorld();
+                }
+            }
+        });
 
         function startGame(mode) {
             state.currentMode = mode;
