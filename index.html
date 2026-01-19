@@ -2418,9 +2418,28 @@
         }
         
         async function saveScore(mode, score, accuracy, playerName) {
+            // accuracyが文字列（"%を含む）の場合は数値に変換
+            let accNum;
+            let accValue;
+            if (typeof accuracy === 'string') {
+                // "85%"のような形式を数値に変換
+                accValue = parseFloat(accuracy.replace('%', ''));
+                accNum = accValue / 100;
+            } else {
+                accValue = parseFloat(accuracy);
+                accNum = accValue / 100;
+            }
+            
             // 効率値 = スコア × 正確さ（%を小数に変換）
-            const accNum = parseFloat(accuracy) / 100;
             const efficiency = Math.round(score * accNum);
+            
+            console.log('saveScore called:', {
+                mode, score, 
+                accuracyOriginal: accuracy, 
+                accuracyType: typeof accuracy,
+                accuracyValue: accValue,
+                efficiency
+            });
             
             // オートセーブ：プレイヤー名がなければ前回の名前を使用、なければ'Player'
             let name = playerName && playerName.trim() ? playerName.trim() : '';
@@ -2435,7 +2454,7 @@
             const scoreData = {
                 name: name,
                 score: score,
-                accuracy: accuracy,
+                accuracy: accValue, // 数値として保存
                 efficiency: efficiency,
                 duration: state.gameDuration,
                 targetSize: targetSize,
@@ -2473,12 +2492,17 @@
                 const saveToWorldRanking = async (retryCount = 0) => {
                     const maxRetries = 3;
                     try {
+                        // accuracyが文字列の場合は数値に変換（念のため）
+                        const accForAPI = typeof accuracy === 'string' 
+                            ? parseFloat(accuracy.replace('%', '')) 
+                            : parseFloat(accuracy);
+                        
                         const requestBody = {
                             mode: mode,
                             name: name,
-                            score: score,
-                            accuracy: accuracy,
-                            efficiency: efficiency
+                            score: parseInt(score),
+                            accuracy: accForAPI,
+                            efficiency: parseInt(efficiency)
                         };
                         
                         console.log('Sending POST request to /api/ranking:', requestBody);
