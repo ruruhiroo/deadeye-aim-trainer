@@ -1,0 +1,122 @@
+---
+alwaysApply: true
+description: DEADEYE AIM TRAINER プロジェクトの実装メモ
+---
+
+# DEADEYE AIM TRAINER - 実装メモ
+
+## プロジェクト概要
+Valorant風のエイム練習ツール。Web上で動作し、マッチング中や倒された後に使用可能。
+
+## 技術スタック
+- **フロントエンド**: HTML, CSS, JavaScript (バニラ)
+- **3D描画**: Three.js
+- **ホスティング**: Vercel
+- **データベース**: Upstash Redis (ワールドランキング用)
+- **リポジトリ**: https://github.com/ruruhiroo/deadeye-aim-trainer
+
+## 実装済み機能
+
+### ゲームモード
+1. **FLICK** - 出現するターゲットをクリックして破壊
+2. **TRACKING** - 動くターゲットを追従（クリック不要、追従精度で採点）
+3. **GRID SHOT** - 複数のランダム配置ターゲットを破壊
+
+### コア機能
+- **FPS風視点操作**: Pointer Lock APIで実装、マウス移動で視点回転
+- **3D環境**: Three.jsで球体ターゲットと背景を描画
+- **クロスヘア**: 画面中央固定、カスタマイズ可能（サイズ、色、厚さ、ギャップ）
+- **ヒットマーカー**: 命中時に表示
+- **サウンド**: Web Audio APIで命中音、ミス音、カウントダウン音を生成
+
+### 設定システム
+- **感度調整**: 0.1〜2.0（スライダー + 数値入力）
+- **ターゲットサイズ**: 25%〜150%
+- **ゲーム時間**: 15〜60秒
+- **トラッキング速度**: トラッキングモード専用、ゲーム開始時にモーダルで設定
+- **マウス反転**: X軸、Y軸それぞれ設定可能（デフォルトは通常方向）
+
+### プリセット機能
+- 設定をプリセットとして保存・読み込み
+- プリセットの編集・削除
+- デフォルトプリセット（50% / 30s / 感度1.0）
+
+### ランキングシステム
+
+#### オフラインランキング
+- `localStorage`に保存
+- 各モード別に50位まで表示
+- 効率値（スコア × 正確さ）でソート
+- プレイヤー名ごとに最高スコアのみ保持
+
+#### ワールドランキング
+- **条件**: ターゲットサイズ50%、ゲーム時間30秒のみ対象
+- **API**: `/api/ranking` (Vercel Serverless Function)
+- **データベース**: Upstash Redis
+  - 環境変数: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+  - キー: `ranking:{mode}` (Sorted Set)
+- **機能**:
+  - GET: ランキング取得（50位まで）
+  - POST: スコア保存
+  - テストモード: `?test=true`
+- **クライアント側**:
+  - リトライ機能（最大3回、指数バックオフ）
+  - キャッシュ（5秒）
+  - 接続テストボタン
+
+### UI/UX
+- **メニュー**: パーティクルアニメーション、グリッド背景、コーナーデコレーション
+- **HUD**: スコア、時間、正確さを表示
+- **リザルト画面**: 3秒クールダウン（誤操作防止）
+- **設定パネル**: 歯車アイコンでトグル
+- **ランキングパネル**: ワールド/オフライン別タブ
+
+## 既知の問題・デバッグ
+
+### ワールドランキングが保存されない問題（調査中）
+**症状**: テスト接続は成功するが、記録が保存されない/表示されない
+
+**デバッグ用ログ（コンソール）**:
+- `saveScore called:` - accuracy の値と型を確認
+- `Sending POST request to /api/ranking:` - 送信データ
+- `World ranking saved successfully:` - 保存結果
+
+**デバッグ用ログ（Vercelログ）**:
+- `POST request received:` - 受信データ
+- `ZADD result:` - Redis保存結果
+- `Total scores in sorted set (ZCARD):` - 件数
+- `Verification - top 10 scores after save:` - 検証結果
+
+**修正履歴**:
+1. `accuracy`が`"85%"`形式の文字列で送信されていた → 数値に変換
+2. Upstashレスポンス形式の不一致 → パース処理を改善
+3. 環境変数の確認 → VercelダッシュボードでUPSTASH_*を確認
+
+### Grid Shotランダム配置
+- X: -10〜10, Y: -6〜6, Z: -12〜-2 の範囲でランダム配置
+- 5個同時出現
+
+### 視点移動範囲
+- Pitch（上下）: -90°〜90°
+- Yaw（左右）: -180°〜180°
+
+## ファイル構成
+```
+aim/
+├── index.html          # メインファイル（HTML + CSS + JS全て）
+├── api/
+│   └── ranking.js      # Vercel Serverless Function
+├── vercel.json         # Vercel設定
+└── .cursor/
+    └── rules/
+        └── ganbare.mdc # このファイル
+```
+
+## デプロイ方法
+1. GitHubにpush
+2. Vercelが自動デプロイ（main ブランチ）
+
+## 注意事項
+- Three.jsはCDN経由で読み込み
+- フォントはGoogle Fonts（Orbitron, Rajdhani）
+- ランキングはmode別に分離（flick, tracking, grid）
