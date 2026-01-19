@@ -2561,34 +2561,12 @@
                             updated: result.updated
                         });
                         
-                        // 保存成功時にキャッシュをクリアしてランキングを更新
-                        // キャッシュを完全にクリア
-                        Object.keys(rankingCache).forEach(key => {
-                            if (key.startsWith(mode + '_')) {
-                                delete rankingCache[key];
-                            }
-                        });
-                        console.log('Cache cleared for mode:', mode);
-                        
-                        // 少し待ってからランキングを更新（Upstashの反映を待つ）
-                        setTimeout(() => {
-                            if (currentRankingType === 'world' && currentRankingMode === mode) {
-                                console.log('Refreshing ranking display after save...');
-                                displayRanking(mode, 'world');
-                            }
-                        }, 1000);
+                        // 保存成功時にキャッシュのみクリア（ランキング更新はしない）
+                        // ランキング更新はメニュー/リトライボタン押下時のみ行う
                         if (result.success) {
-                            // キャッシュをクリア
                             const cacheKey = `${mode}_world`;
                             delete rankingCache[cacheKey];
-                            
-                            // ランキングパネルが開いている場合は更新
-                            if (rankingPanel.classList.contains('open') && currentRankingMode === mode && currentRankingType === 'world') {
-                                console.log('Auto-refreshing ranking after save');
-                                setTimeout(() => {
-                                    displayRanking(mode, 'world');
-                                }, 500);
-                            }
+                            console.log('Cache cleared for mode:', mode, '(ranking will be updated on menu/retry button click)');
                         }
                     } catch (error) {
                         // リトライ可能なエラーの場合
@@ -3268,6 +3246,14 @@
                 saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, currentName);
             }
             
+            // ランキングパネルが開いている場合は更新
+            if (rankingPanel.classList.contains('open') && currentRankingMode && currentRankingType === 'world') {
+                console.log('Refreshing ranking after retry...');
+                setTimeout(() => {
+                    displayRanking(currentRankingMode, 'world');
+                }, 500);
+            }
+            
             state.pendingScore = null;
             resultOverlay.classList.remove('active');
             resetState();
@@ -3283,6 +3269,14 @@
             
             if (currentName && currentName !== savedName && state.pendingScore) {
                 saveScore(state.pendingScore.mode, state.pendingScore.score, state.pendingScore.accuracy, currentName);
+            }
+            
+            // ランキングパネルが開いている場合は更新
+            if (rankingPanel.classList.contains('open') && currentRankingMode && currentRankingType === 'world') {
+                console.log('Refreshing ranking after returning to menu...');
+                setTimeout(() => {
+                    displayRanking(currentRankingMode, 'world');
+                }, 500);
             }
             
             state.pendingScore = null;
