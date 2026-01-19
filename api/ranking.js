@@ -38,8 +38,8 @@ export default async function handler(req, res) {
     
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
@@ -610,6 +610,94 @@ export default async function handler(req, res) {
                 rank: playerRank,
                 updated: true
             });
+        }
+
+        // DELETE: スコア削除（管理者用）
+        if (req.method === 'DELETE') {
+            const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+            const authHeader = req.headers.authorization;
+            
+            if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            const { mode, name, efficiency } = req.body;
+            if (!mode || !name || efficiency === undefined) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const key = `ranking:${mode}`;
+            const playerKey = `player:${mode}:${name}`;
+
+            // スコアデータを構築して削除
+            const scoreDataStr = JSON.stringify({
+                name: name,
+                efficiency: parseInt(efficiency)
+            });
+
+            // Sorted setから削除
+            await upstashCommand(['ZREM', key, scoreDataStr]);
+            
+            // プレイヤーのベストスコアも削除
+            await upstashCommand(['DEL', playerKey]);
+
+            return res.status(200).json({ success: true, message: 'Score deleted' });
+        }
+
+        // PUT: スコア編集（管理者用）
+        if (req.method === 'PUT') {
+            const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+            const authHeader = req.headers.authorization;
+            
+            if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            let { mode, oldName, oldEfficiency, newName, newScore, newAccuracy, newEfficiency } = req.body;
+            
+            if (!mode || !oldName || oldEfficiency === undefined || !newName || newScore === undefined || newAccuracy === undefined || newEfficiency === undefined) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const key = `ranking:${mode}`;
+            const oldPlayerKey = `player:${mode}:${oldName}`;
+            const newPlayerKey = `player:${mode}:${newName}`;
+
+            // 古いスコアデータ
+            const oldScoreDataStr = JSON.stringify({
+                name: oldName,
+                efficiency: parseInt(oldEfficiency)
+            });
+
+            // 新しいスコアデータ
+            const newScoreData = {
+                name: newName,
+                score: parseInt(newScore),
+                accuracy: parseFloat(newAccuracy),
+                efficiency: parseInt(newEfficiency),
+                date: new Date().toLocaleDateString('ja-JP')
+            };
+            const newScoreDataStr = JSON.stringify(newScoreData);
+
+            // 古いスコアを削除
+            await upstashCommand(['ZREM', key, oldScoreDataStr]);
+            
+            // 新しいスコアを追加
+            await upstashCommand(['ZADD', key, newEfficiency.toString(), newScoreDataStr]);
+
+            // プレイヤーのベストスコアを更新
+            if (oldName !== newName) {
+                await upstashCommand(['DEL', oldPlayerKey]);
+            }
+            await upstashCommand(['SET', newPlayerKey, newScoreDataStr]);
+
+            // Top 50にトリム
+            const currentCount = await upstashCommand(['ZCARD', key]);
+            if (currentCount && (currentCount.result || currentCount) > 50) {
+                await upstashCommand(['ZREMRANGEBYRANK', key, '50', '-1']);
+            }
+
+            return res.status(200).json({ success: true, message: 'Score updated' });
         }
 
         return res.status(405).json({ error: 'Method not allowed' });

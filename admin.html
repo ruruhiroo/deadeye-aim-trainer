@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEAD//EYE - 管理者用ランキング管理</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #FF4655;
+            --bg-dark: #0F1923;
+            --bg-darker: #0A1018;
+            --bg-card: rgba(15, 25, 35, 0.9);
+            --text-primary: #ECE8E1;
+            --text-secondary: #768079;
+            --accent-cyan: #00FFC2;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: #050508;
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--primary);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .auth-section {
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 400px;
+            margin: 50px auto;
+        }
+
+        .auth-section input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+        }
+
+        .auth-section button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .auth-section button:hover {
+            background: #ff2d3f;
+        }
+
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-tab {
+            padding: 10px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--text-secondary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .mode-tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .ranking-table {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .ranking-table th,
+        .ranking-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 70, 85, 0.2);
+        }
+
+        .ranking-table th {
+            background: rgba(255, 70, 85, 0.1);
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent-cyan);
+        }
+
+        .ranking-table tr:hover {
+            background: rgba(255, 70, 85, 0.05);
+        }
+
+        .btn-edit,
+        .btn-delete {
+            padding: 6px 12px;
+            margin: 0 5px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-edit {
+            background: var(--accent-cyan);
+            color: var(--bg-darker);
+        }
+
+        .btn-edit:hover {
+            background: #00cc99;
+        }
+
+        .btn-delete {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #ff2d3f;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-content h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+        }
+
+        .btn-save {
+            background: var(--accent-cyan);
+            color: var(--bg-darker);
+        }
+
+        .btn-cancel {
+            background: var(--text-secondary);
+            color: white;
+        }
+
+        .error {
+            color: var(--primary);
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255, 70, 85, 0.1);
+            border: 1px solid var(--primary);
+        }
+
+        .success {
+            color: var(--accent-cyan);
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 255, 194, 0.1);
+            border: 1px solid var(--accent-cyan);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DEAD<span style="color: var(--primary)">//</span>EYE - 管理者用ランキング管理</h1>
+
+        <div class="auth-section" id="authSection">
+            <h2 style="font-family: 'Orbitron', sans-serif; margin-bottom: 20px; color: var(--accent-cyan);">認証</h2>
+            <input type="password" id="passwordInput" placeholder="パスワードを入力">
+            <button onclick="authenticate()">ログイン</button>
+            <div id="authError" class="error" style="display: none;"></div>
+        </div>
+
+        <div class="admin-panel" id="adminPanel">
+            <div class="mode-tabs">
+                <button class="mode-tab active" onclick="switchMode('flick')">FLICK</button>
+                <button class="mode-tab" onclick="switchMode('tracking')">TRACK</button>
+                <button class="mode-tab" onclick="switchMode('grid')">GRID</button>
+            </div>
+
+            <div id="message"></div>
+            <table class="ranking-table" id="rankingTable">
+                <thead>
+                    <tr>
+                        <th>順位</th>
+                        <th>名前</th>
+                        <th>スコア</th>
+                        <th>正確さ</th>
+                        <th>効率値</th>
+                        <th>日付</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 編集モーダル -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2>スコアを編集</h2>
+            <input type="text" id="editName" placeholder="名前">
+            <input type="number" id="editScore" placeholder="スコア">
+            <input type="number" id="editAccuracy" placeholder="正確さ (%)" step="0.1">
+            <input type="number" id="editEfficiency" placeholder="効率値">
+            <div class="modal-buttons">
+                <button class="btn-save" onclick="saveEdit()">保存</button>
+                <button class="btn-cancel" onclick="closeEditModal()">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let adminPassword = '';
+        let currentMode = 'flick';
+        let currentEditData = null;
+
+        async function authenticate() {
+            const password = document.getElementById('passwordInput').value;
+            if (!password) {
+                showError('authError', 'パスワードを入力してください');
+                return;
+            }
+
+            adminPassword = password;
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('adminPanel').classList.add('active');
+            loadRankings();
+        }
+
+        async function loadRankings() {
+            try {
+                const response = await fetch(`/api/ranking?mode=${currentMode}`);
+                const data = await response.json();
+                
+                const tbody = document.getElementById('rankingBody');
+                tbody.innerHTML = '';
+
+                if (data.rankings && data.rankings.length > 0) {
+                    data.rankings.forEach((rank, index) => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>#${index + 1}</td>
+                            <td>${rank.name}</td>
+                            <td>${rank.score}</td>
+                            <td>${rank.accuracy}%</td>
+                            <td>${rank.efficiency}</td>
+                            <td>${rank.date}</td>
+                            <td>
+                                <button class="btn-edit" onclick="openEditModal(${index}, '${rank.name}', ${rank.score}, ${rank.accuracy}, ${rank.efficiency})">編集</button>
+                                <button class="btn-delete" onclick="deleteScore('${rank.name}', ${rank.efficiency})">削除</button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">記録がありません</td></tr>';
+                }
+            } catch (error) {
+                showMessage('エラー: ' + error.message, 'error');
+            }
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            loadRankings();
+        }
+
+        function openEditModal(index, name, score, accuracy, efficiency) {
+            currentEditData = { index, name, score, accuracy, efficiency };
+            document.getElementById('editName').value = name;
+            document.getElementById('editScore').value = score;
+            document.getElementById('editAccuracy').value = accuracy;
+            document.getElementById('editEfficiency').value = efficiency;
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+            currentEditData = null;
+        }
+
+        async function saveEdit() {
+            const newName = document.getElementById('editName').value.trim();
+            const newScore = parseInt(document.getElementById('editScore').value);
+            const newAccuracy = parseFloat(document.getElementById('editAccuracy').value);
+            const newEfficiency = parseInt(document.getElementById('editEfficiency').value);
+
+            if (!newName || !newScore || !newAccuracy || !newEfficiency) {
+                showMessage('すべてのフィールドを入力してください', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/ranking', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminPassword}`
+                    },
+                    body: JSON.stringify({
+                        mode: currentMode,
+                        oldName: currentEditData.name,
+                        oldEfficiency: currentEditData.efficiency,
+                        newName: newName,
+                        newScore: newScore,
+                        newAccuracy: newAccuracy,
+                        newEfficiency: newEfficiency
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage('スコアを更新しました', 'success');
+                    closeEditModal();
+                    loadRankings();
+                } else {
+                    showMessage('エラー: ' + (data.error || '更新に失敗しました'), 'error');
+                }
+            } catch (error) {
+                showMessage('エラー: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteScore(name, efficiency) {
+            if (!confirm(`「${name}」のスコアを削除しますか？`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/ranking', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminPassword}`
+                    },
+                    body: JSON.stringify({
+                        mode: currentMode,
+                        name: name,
+                        efficiency: efficiency
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage('スコアを削除しました', 'success');
+                    loadRankings();
+                } else {
+                    showMessage('エラー: ' + (data.error || '削除に失敗しました'), 'error');
+                }
+            } catch (error) {
+                showMessage('エラー: ' + error.message, 'error');
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = type;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        function showError(id, message) {
+            const errorDiv = document.getElementById(id);
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Enterキーでログイン
+        document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                authenticate();
+            }
+        });
+    </script>
+</body>
+</html>
+
