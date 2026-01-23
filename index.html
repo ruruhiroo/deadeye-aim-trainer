@@ -1388,6 +1388,9 @@
     <div class="ranking-panel" id="rankingPanel">
         <div class="ranking-header">
             <span class="ranking-title" id="rankingTitle">🌍 WORLD RANKING</span>
+            <div class="ranking-notice" style="font-size: 0.75rem; color: var(--accent-cyan); margin: 8px 0; text-align: center; opacity: 0.8;">
+                ※ ランキングは効率値（スコア × 正確さ）で順位が決まります
+            </div>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="ranking-refresh" id="rankingTest" title="接続テスト" style="font-size: 0.8rem; padding: 5px 8px;">
                     テスト
@@ -1401,7 +1404,8 @@
             </div>
         </div>
         <div class="ranking-notice" id="rankingNotice">
-            ⚠️ ランキングは「的のサイズ50%・ゲーム時間30秒」のみ反映されます
+            ⚠️ ランキングは「的のサイズ50%・ゲーム時間30秒」のみ反映されます<br>
+            ※ 順位は効率値（スコア × 正確さ）で決まります
         </div>
         <div class="ranking-tabs">
             <button class="ranking-tab active" data-mode="flick" data-type="world">FLICK</button>
