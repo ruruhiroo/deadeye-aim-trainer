@@ -3090,16 +3090,6 @@
             });
             const sphere = new THREE.Mesh(geometry, material);
             
-            // グロー効果
-            const glowGeometry = new THREE.SphereGeometry(size * 1.2, 32, 32);
-            const glowMaterial = new THREE.MeshBasicMaterial({
-                color: isTracking ? 0x00ffc2 : 0xff4655,
-                transparent: true,
-                opacity: 0.15
-            });
-            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-            sphere.add(glow);
-            
             sphere.userData = { hit: false, isTracking };
             return sphere;
         }
