@@ -1399,10 +1399,6 @@
                 <button class="ranking-close" id="rankingClose">✕</button>
             </div>
         </div>
-        <div class="ranking-notice" id="rankingNotice">
-            ⚠️ ランキングは「的のサイズ50%・ゲーム時間30秒」のみ反映されます<br>
-            ※ 順位は効率値（スコア × 正確さ）で決まります
-        </div>
         <div class="ranking-tabs">
             <button class="ranking-tab active" data-mode="flick" data-type="world">FLICK</button>
             <button class="ranking-tab" data-mode="tracking" data-type="world">TRACK</button>
@@ -1414,6 +1410,10 @@
             <button class="ranking-tab ranking-tab-offline" data-mode="gridshot" data-type="offline" data-offline-mode="gridshot">オフライン GRID</button>
         </div>
         <div class="ranking-list" id="rankingList"></div>
+        <div class="ranking-notice" id="rankingNotice" style="padding: 12px 15px; background: rgba(255, 193, 7, 0.1); border-top: 1px solid rgba(255, 193, 7, 0.2); color: #FFC107; font-size: 0.8rem; line-height: 1.5;">
+            <div style="margin-bottom: 4px;">⚠️ ランキングは「的のサイズ50%・ゲーム時間30秒」のみ反映されます</div>
+            <div>※ 順位は効率値（スコア × 正確さ）で決まります</div>
+        </div>
     </div>
     
     <!-- 設定パネル -->
