@@ -1916,28 +1916,27 @@
             gridshot: { baseSize: 70, instruction: '全ての的を処理！' }
         };
 
-        // イベントリスナーを設定（即座に実行）
+        // イベントリスナーを設定
         console.log('Setting up mode card event listeners...');
         const modeCards = document.querySelectorAll('.mode-card');
         console.log('Found mode cards:', modeCards.length);
         
         modeCards.forEach((card, index) => {
-            console.log(`Setting up listener for card ${index}:`, card.dataset.mode, card);
-            // 既存のイベントリスナーを削除（重複防止）
-            const newCard = card.cloneNode(true);
-            card.parentNode.replaceChild(newCard, card);
-            
-            newCard.addEventListener('click', (e) => {
+            console.log(`Setting up listener for card ${index}:`, card.dataset.mode);
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Mode card clicked:', newCard.dataset.mode, newCard);
-                const mode = newCard.dataset.mode;
+                console.log('Mode card clicked:', this.dataset.mode, this);
+                const mode = this.dataset.mode;
                 if (!mode) {
-                    console.error('No mode found on card:', newCard);
+                    console.error('No mode found on card:', this);
+                    alert('モードが見つかりません: ' + this);
                     return;
                 }
+                console.log('Calling startGame with mode:', mode);
                 startGame(mode);
-            });
+            }, false);
         });
         backBtn.addEventListener('click', backToMenu);
         document.getElementById('retryBtn').addEventListener('click', retryGame);
