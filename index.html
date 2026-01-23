@@ -1916,35 +1916,29 @@
             gridshot: { baseSize: 70, instruction: '全ての的を処理！' }
         };
 
-        // イベントリスナーを設定（DOMContentLoadedで確実に実行）
-        function setupEventListeners() {
-            console.log('Setting up event listeners...');
-            const modeCards = document.querySelectorAll('.mode-card');
-            console.log('Found mode cards:', modeCards.length);
+        // イベントリスナーを設定（即座に実行）
+        console.log('Setting up mode card event listeners...');
+        const modeCards = document.querySelectorAll('.mode-card');
+        console.log('Found mode cards:', modeCards.length);
+        
+        modeCards.forEach((card, index) => {
+            console.log(`Setting up listener for card ${index}:`, card.dataset.mode, card);
+            // 既存のイベントリスナーを削除（重複防止）
+            const newCard = card.cloneNode(true);
+            card.parentNode.replaceChild(newCard, card);
             
-            modeCards.forEach((card, index) => {
-                console.log(`Setting up listener for card ${index}:`, card.dataset.mode);
-                card.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Mode card clicked:', card.dataset.mode, card);
-                    const mode = card.dataset.mode;
-                    if (!mode) {
-                        console.error('No mode found on card:', card);
-                        return;
-                    }
-                    startGame(mode);
-                });
+            newCard.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Mode card clicked:', newCard.dataset.mode, newCard);
+                const mode = newCard.dataset.mode;
+                if (!mode) {
+                    console.error('No mode found on card:', newCard);
+                    return;
+                }
+                startGame(mode);
             });
-        }
-
-        // DOMContentLoadedで実行
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', setupEventListeners);
-        } else {
-            // 既に読み込み済みの場合は即座に実行
-            setupEventListeners();
-        }
+        });
         backBtn.addEventListener('click', backToMenu);
         document.getElementById('retryBtn').addEventListener('click', retryGame);
         document.getElementById('menuBtn').addEventListener('click', backToMenu);
