@@ -2895,10 +2895,6 @@
                 camera.rotation.y = -state.yaw * Math.PI / 180;
                 cameraNeedsUpdate = false;
                 
-                // デバッグ：レイキャストの線を更新
-                if (debugLine && state.isPlaying) {
-                    updateDebugLine();
-                }
             }
             
             // ゲーム中のみレンダリング
@@ -2968,9 +2964,6 @@
             // 画面中央からレイキャスト
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(targets3D);
-            
-            // デバッグ：レイキャストの線を更新
-            updateDebugLine();
             
             let hitAny = false;
             
@@ -3180,15 +3173,6 @@
             targets3D.forEach(t => scene.remove(t));
             targets3D.length = 0;
             
-            // デバッグ用のオブジェクトもクリア
-            if (debugLine) {
-                scene.remove(debugLine);
-                debugLine = null;
-            }
-            if (debugHelper) {
-                scene.remove(debugHelper);
-                debugHelper = null;
-            }
         }
 
         function startTracking() {
