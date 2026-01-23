@@ -1916,17 +1916,35 @@
             gridshot: { baseSize: 70, instruction: '全ての的を処理！' }
         };
 
-        document.querySelectorAll('.mode-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                console.log('Mode card clicked:', card.dataset.mode);
-                const mode = card.dataset.mode;
-                if (!mode) {
-                    console.error('No mode found on card:', card);
-                    return;
-                }
-                startGame(mode);
+        // イベントリスナーを設定（DOMContentLoadedで確実に実行）
+        function setupEventListeners() {
+            console.log('Setting up event listeners...');
+            const modeCards = document.querySelectorAll('.mode-card');
+            console.log('Found mode cards:', modeCards.length);
+            
+            modeCards.forEach((card, index) => {
+                console.log(`Setting up listener for card ${index}:`, card.dataset.mode);
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Mode card clicked:', card.dataset.mode, card);
+                    const mode = card.dataset.mode;
+                    if (!mode) {
+                        console.error('No mode found on card:', card);
+                        return;
+                    }
+                    startGame(mode);
+                });
             });
-        });
+        }
+
+        // DOMContentLoadedで実行
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupEventListeners);
+        } else {
+            // 既に読み込み済みの場合は即座に実行
+            setupEventListeners();
+        }
         backBtn.addEventListener('click', backToMenu);
         document.getElementById('retryBtn').addEventListener('click', retryGame);
         document.getElementById('menuBtn').addEventListener('click', backToMenu);
