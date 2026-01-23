@@ -1917,7 +1917,15 @@
         };
 
         document.querySelectorAll('.mode-card').forEach(card => {
-            card.addEventListener('click', () => startGame(card.dataset.mode));
+            card.addEventListener('click', (e) => {
+                console.log('Mode card clicked:', card.dataset.mode);
+                const mode = card.dataset.mode;
+                if (!mode) {
+                    console.error('No mode found on card:', card);
+                    return;
+                }
+                startGame(mode);
+            });
         });
         backBtn.addEventListener('click', backToMenu);
         document.getElementById('retryBtn').addEventListener('click', retryGame);
@@ -2969,6 +2977,18 @@
         });
 
         function startGame(mode) {
+            console.log('startGame called with mode:', mode);
+            
+            if (!mode) {
+                console.error('startGame: mode is undefined');
+                return;
+            }
+            
+            if (!modeConfig[mode]) {
+                console.error('startGame: modeConfig[' + mode + '] is undefined', modeConfig);
+                return;
+            }
+            
             state.currentMode = mode;
             resetState();
             
@@ -2978,6 +2998,7 @@
                 return;
             }
             
+            console.log('Starting game for mode:', mode);
             menuScreen.classList.add('hidden');
             hud.classList.add('active');
             escHint.classList.add('active');
