@@ -2958,7 +2958,8 @@
                     hitAny = true;
                     state.reactionTimes.push(Date.now() - state.lastTargetTime);
                     hitTarget3D(target);
-                    
+                }
+            }
             
             state.totalClicks++;
             if (!hitAny) { state.misses++; playMissSound(); }
